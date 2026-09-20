@@ -1,47 +1,60 @@
-local players = game:GetService("Players")
-local camera = workspace.CurrentCamera
-local localPlayer = players.LocalPlayer
+local Players = game:GetService("Players")
 
--- Criar uma tabela para armazenar os ESPs
-local espBoxes = {}
+local localPlayer = Players.LocalPlayer
+local highlights = {}
 
--- Função para criar um ESP para um jogador
-local function createESP(player)
-    if player == localPlayer then return end -- Ignorar o próprio jogador
+local function createGlow(player)
+	if player == localPlayer then
+		return
+	end
 
-    local box = Drawing.new("Square")
-    box.Color = Color3.fromRGB(255, 0, 0)  -- Vermelho
-    box.Thickness = 2
-    box.Filled = false
-    box.Visible = false
+	local function apply(character)
+		if highlights[player] then
+			highlights[player]:Destroy()
+			highlights[player] = nil
+		end
 
-    espBoxes[player] = box
+		local highlight = Instance.new("Highlight")
+
+		highlight.Name = "PlayerGlow"
+		highlight.Adornee = character
+		highlight.FillColor = Color3.fromRGB(255, 0, 0)
+		highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+
+		-- Quanto menor, mais sólido fica o interior.
+		highlight.FillTransparency = 0.7
+
+		-- 0 = contorno totalmente visível
+		highlight.OutlineTransparency = 0
+
+		-- Permite visualizar mesmo através de objetos.
+		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+
+		highlight.Parent = character
+
+		highlights[player] = highlight
+	end
+
+	if player.Character then
+		apply(player.Character)
+	end
+
+	player.CharacterAdded:Connect(function(character)
+		apply(character)
+	end)
 end
 
--- Criar ESP para todos os jogadores
-for _, player in pairs(players:GetPlayers()) do
-    createESP(player)
+local function removeGlow(player)
+	if highlights[player] then
+		highlights[player]:Destroy()
+		highlights[player] = nil
+	end
 end
 
--- Atualizar ESP em tempo real
-game:GetService("RunService").RenderStepped:Connect(function()
-    for player, box in pairs(espBoxes) do
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = player.Character.HumanoidRootPart
-            local screenPosition, onScreen = camera:WorldToViewportPoint(hrp.Position)
+for _, player in ipairs(Players:GetPlayers()) do
+	createGlow(player)
+end
 
-            if onScreen then
-                box.Size = Vector2.new(50, 100)  -- Ajuste o tamanho da caixa
-                box.Position = Vector2.new(screenPosition.X - 25, screenPosition.Y - 50)
-                box.Visible = true
-            else
-                box.Visible = false
-            end
-        else
-            box.Visible = false
-        end
-    end
-end)
+Players.PlayerAdded:Connect(createGlow)
 
--- Atualizar quando um jogador entra no jogo
-players.PlayerAdded:Connect(createESP)
+Players.PlayerRemoving:Connect(removeGlow)
