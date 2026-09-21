@@ -3,41 +3,59 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local localPlayer = Players.LocalPlayer
+local playerGui = localPlayer:WaitForChild("PlayerGui")
+
 local camera = workspace.CurrentCamera
 
 --------------------------------------------------
--- CONFIGURAÇÕES
+-- CONFIG
 --------------------------------------------------
 
 local config = {
-	-- ESP
-	Enabled = true,
 
-	VisibleHue = 0.33, -- Verde
-	HiddenHue = 0,     -- Vermelho
+	-- ESP
+	ESPEnabled = true,
+
+	VisibleHue = 0.33,
+	HiddenHue = 0,
 
 	FillIntensity = 0.35,
 	OutlineTransparency = 0,
 
+	-- frequência de atualização do ESP
+	-- menor = mais rápido
+	ESPUpdateInterval = 0.06,
+
+	--------------------------------------------------
 	-- AIMBOT
+	--------------------------------------------------
+
 	AimbotEnabled = false,
 
-	-- Quanto maior, mais rápido trava no alvo.
-	-- 0 = instantâneo
-	AimbotSmoothness = 0.18,
+	-- raio em pixels
+	AimbotFOV = 220,
 
-	-- Distância em pixels do centro da tela
-	-- para selecionar um alvo
-	AimbotFOV = 250
+	-- velocidade de aproximação
+	-- 20~30 = rápido
+	AimSpeed = 26,
+
+	ShowFOV = true
 }
+
+--------------------------------------------------
+-- ESTADO
+--------------------------------------------------
 
 local highlights = {}
 
---------------------------------------------------
--- LIMPAR GUI ANTIGA CASO EXECUTE NOVAMENTE
---------------------------------------------------
+local rightMouseDown = false
+local lockedTarget = nil
 
-local playerGui = localPlayer:WaitForChild("PlayerGui")
+local espAccumulator = 0
+
+--------------------------------------------------
+-- LIMPEZA CASO EXECUTE NOVAMENTE
+--------------------------------------------------
 
 local oldGui = playerGui:FindFirstChild("ESPSettings")
 
@@ -46,10 +64,47 @@ if oldGui then
 end
 
 --------------------------------------------------
+-- RAYCAST PARAMS REUTILIZÁVEL
+--------------------------------------------------
+
+local rayParams = RaycastParams.new()
+
+rayParams.FilterType =
+	Enum.RaycastFilterType.Exclude
+
+rayParams.IgnoreWater = true
+
+local function updateRaycastIgnore()
+
+	local ignore = {}
+
+	if localPlayer.Character then
+		table.insert(
+			ignore,
+			localPlayer.Character
+		)
+	end
+
+	rayParams.FilterDescendantsInstances =
+		ignore
+end
+
+updateRaycastIgnore()
+
+localPlayer.CharacterAdded:Connect(
+	function()
+		task.wait()
+
+		updateRaycastIgnore()
+	end
+)
+
+--------------------------------------------------
 -- CORES
 --------------------------------------------------
 
 local function getVisibleColor()
+
 	return Color3.fromHSV(
 		config.VisibleHue,
 		1,
@@ -58,6 +113,7 @@ local function getVisibleColor()
 end
 
 local function getHiddenColor()
+
 	return Color3.fromHSV(
 		config.HiddenHue,
 		1,
@@ -66,7 +122,7 @@ local function getHiddenColor()
 end
 
 --------------------------------------------------
--- CRIAR HIGHLIGHT
+-- ESP
 --------------------------------------------------
 
 local function createHighlight(player)
@@ -81,10 +137,14 @@ local function createHighlight(player)
 			highlights[player]:Destroy()
 		end
 
-		local highlight = Instance.new("Highlight")
+		local highlight =
+			Instance.new("Highlight")
 
-		highlight.Name = "PlayerESP"
-		highlight.Adornee = character
+		highlight.Name =
+			"PlayerESP"
+
+		highlight.Adornee =
+			character
 
 		highlight.FillTransparency =
 			1 - config.FillIntensity
@@ -95,55 +155,86 @@ local function createHighlight(player)
 		highlight.DepthMode =
 			Enum.HighlightDepthMode.AlwaysOnTop
 
-		highlight.Parent = character
+		highlight.Parent =
+			character
 
-		highlights[player] = highlight
+		highlights[player] =
+			highlight
 	end
 
 	if player.Character then
 		apply(player.Character)
 	end
 
-	player.CharacterAdded:Connect(apply)
+	player.CharacterAdded:Connect(
+		apply
+	)
 end
-
---------------------------------------------------
--- REMOVER HIGHLIGHT
---------------------------------------------------
 
 local function removeHighlight(player)
 
 	if highlights[player] then
 
 		highlights[player]:Destroy()
-		highlights[player] = nil
 
+		highlights[player] = nil
+	end
+
+	if lockedTarget == player then
+		lockedTarget = nil
 	end
 end
 
 --------------------------------------------------
--- VERIFICAR SE PLAYER ESTÁ VISÍVEL
+-- CHARACTER VALIDATION
+--------------------------------------------------
+
+local function getValidCharacter(player)
+
+	local character =
+		player.Character
+
+	if not character then
+		return nil
+	end
+
+	local humanoid =
+		character:FindFirstChildOfClass(
+			"Humanoid"
+		)
+
+	if not humanoid
+		or humanoid.Health <= 0
+	then
+		return nil
+	end
+
+	local head =
+		character:FindFirstChild(
+			"Head"
+		)
+
+	if not head then
+		return nil
+	end
+
+	return character, humanoid, head
+end
+
+--------------------------------------------------
+-- LINE OF SIGHT
 --------------------------------------------------
 
 local function isPlayerVisible(player)
-
-	camera = workspace.CurrentCamera
 
 	if not camera then
 		return false
 	end
 
-	local character = player.Character
+	local character, _, head =
+		getValidCharacter(player)
 
 	if not character then
-		return false
-	end
-
-	local targetPart =
-		character:FindFirstChild("Head")
-		or character:FindFirstChild("HumanoidRootPart")
-
-	if not targetPart then
 		return false
 	end
 
@@ -151,75 +242,102 @@ local function isPlayerVisible(player)
 		camera.CFrame.Position
 
 	local direction =
-		targetPart.Position - origin
-
-	local params =
-		RaycastParams.new()
-
-	params.FilterType =
-		Enum.RaycastFilterType.Exclude
-
-	local ignoreList = {}
-
-	if localPlayer.Character then
-
-		table.insert(
-			ignoreList,
-			localPlayer.Character
-		)
-
-	end
-
-	params.FilterDescendantsInstances =
-		ignoreList
-
-	params.IgnoreWater = true
+		head.Position - origin
 
 	local result =
 		workspace:Raycast(
 			origin,
 			direction,
-			params
+			rayParams
 		)
 
-	-- Não bateu em nada
 	if not result then
 		return true
 	end
 
-	-- Bateu no próprio player alvo
-	if result.Instance:IsDescendantOf(character) then
-		return true
-	end
-
-	-- Parede / objeto bloqueando
-	return false
+	return result.Instance:IsDescendantOf(
+		character
+	)
 end
 
 --------------------------------------------------
--- AIMBOT - ENCONTRAR PLAYER MAIS PRÓXIMO
--- DO CENTRO DA TELA
+-- DISTÂNCIA DO ALVO AO CENTRO DA TELA
 --------------------------------------------------
 
-local function getClosestAimbotTarget()
+local function getScreenDistance(head)
 
-	camera = workspace.CurrentCamera
+	local position,
+		onScreen =
+		camera:WorldToViewportPoint(
+			head.Position
+		)
 
-	if not camera then
+	if not onScreen
+		or position.Z <= 0
+	then
 		return nil
 	end
 
-	local viewportSize =
-		camera.ViewportSize
-
-	local screenCenter =
+	local center =
 		Vector2.new(
-			viewportSize.X / 2,
-			viewportSize.Y / 2
+			camera.ViewportSize.X / 2,
+			camera.ViewportSize.Y / 2
 		)
 
-	local closestHead = nil
-	local closestDistance =
+	local target =
+		Vector2.new(
+			position.X,
+			position.Y
+		)
+
+	return (
+		target - center
+	).Magnitude
+end
+
+--------------------------------------------------
+-- VALIDAR ALVO AIMBOT
+--------------------------------------------------
+
+local function isValidAimbotTarget(player)
+
+	if not player
+		or player == localPlayer
+	then
+		return false
+	end
+
+	local character, _, head =
+		getValidCharacter(player)
+
+	if not character then
+		return false
+	end
+
+	local distance =
+		getScreenDistance(head)
+
+	if not distance
+		or distance > config.AimbotFOV
+	then
+		return false
+	end
+
+	if not isPlayerVisible(player) then
+		return false
+	end
+
+	return true
+end
+
+--------------------------------------------------
+-- PEGAR MELHOR ALVO
+--------------------------------------------------
+
+local function findClosestTarget()
+
+	local bestPlayer = nil
+	local bestDistance =
 		config.AimbotFOV
 
 	for _, player in ipairs(
@@ -228,101 +346,175 @@ local function getClosestAimbotTarget()
 
 		if player ~= localPlayer then
 
-			local character =
-				player.Character
+			local character, _, head =
+				getValidCharacter(player)
 
 			if character then
 
-				local humanoid =
-					character:FindFirstChildOfClass(
-						"Humanoid"
-					)
+				local distance =
+					getScreenDistance(head)
 
-				local head =
-					character:FindFirstChild(
-						"Head"
-					)
-
-				if humanoid
-				and humanoid.Health > 0
-				and head
-				and isPlayerVisible(player)
+				if distance
+					and distance < bestDistance
+					and isPlayerVisible(player)
 				then
 
-					local screenPosition,
-						onScreen =
-						camera:WorldToViewportPoint(
-							head.Position
-						)
+					bestDistance =
+						distance
 
-					if onScreen
-						and screenPosition.Z > 0
-					then
-
-						local position2D =
-							Vector2.new(
-								screenPosition.X,
-								screenPosition.Y
-							)
-
-						local distance =
-							(
-								position2D
-								- screenCenter
-							).Magnitude
-
-						if distance
-							< closestDistance
-						then
-
-							closestDistance =
-								distance
-
-							closestHead =
-								head
-
-						end
-					end
+					bestPlayer =
+						player
 				end
 			end
 		end
 	end
 
-	return closestHead
+	return bestPlayer
 end
+
+--------------------------------------------------
+-- AIMBOT
+--------------------------------------------------
+
+local function updateAimbot(dt, menuOpen)
+
+	if not config.AimbotEnabled then
+		lockedTarget = nil
+		return
+	end
+
+	-- somente segurando RMB
+	if not rightMouseDown then
+		lockedTarget = nil
+		return
+	end
+
+	-- não mexer enquanto configura menu
+	if menuOpen then
+		return
+	end
+
+	camera =
+		workspace.CurrentCamera
+
+	if not camera then
+		return
+	end
+
+	--------------------------------------------------
+	-- MANTER ALVO TRAVADO
+	--------------------------------------------------
+
+	if not isValidAimbotTarget(
+		lockedTarget
+	) then
+
+		lockedTarget =
+			findClosestTarget()
+	end
+
+	if not lockedTarget then
+		return
+	end
+
+	local character, _, head =
+		getValidCharacter(
+			lockedTarget
+		)
+
+	if not character then
+		lockedTarget = nil
+		return
+	end
+
+	--------------------------------------------------
+	-- CÂMERA
+	--------------------------------------------------
+
+	local current =
+		camera.CFrame
+
+	local target =
+		CFrame.lookAt(
+			current.Position,
+			head.Position
+		)
+
+	--------------------------------------------------
+	-- INTERPOLAÇÃO EXPONENCIAL
+	--
+	-- Muito mais consistente que um Lerp fixo.
+	--------------------------------------------------
+
+	local alpha =
+		1 - math.exp(
+			-config.AimSpeed * dt
+		)
+
+	camera.CFrame =
+		current:Lerp(
+			target,
+			alpha
+		)
+end
+
+--------------------------------------------------
+-- PLAYERS
+--------------------------------------------------
+
+for _, player in ipairs(
+	Players:GetPlayers()
+) do
+
+	createHighlight(player)
+end
+
+Players.PlayerAdded:Connect(
+	createHighlight
+)
+
+Players.PlayerRemoving:Connect(
+	removeHighlight
+)
 
 --------------------------------------------------
 -- GUI
 --------------------------------------------------
 
-local gui = Instance.new("ScreenGui")
+local gui =
+	Instance.new("ScreenGui")
 
-gui.Name = "ESPSettings"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
+gui.Name =
+	"ESPSettings"
 
-gui.Parent = playerGui
+gui.ResetOnSpawn =
+	false
+
+gui.IgnoreGuiInset =
+	true
+
+gui.Parent =
+	playerGui
 
 --------------------------------------------------
--- JANELA PRINCIPAL
+-- MAIN
 --------------------------------------------------
 
-local main = Instance.new("Frame")
-
-main.Name = "Main"
+local main =
+	Instance.new("Frame")
 
 main.Size =
 	UDim2.fromOffset(
-		350,
-		390
+		370,
+		500
 	)
 
 main.Position =
 	UDim2.new(
 		0.5,
-		-175,
+		-185,
 		0.5,
-		-195
+		-250
 	)
 
 main.BackgroundColor3 =
@@ -345,10 +537,11 @@ corner.CornerRadius =
 		10
 	)
 
-corner.Parent = main
+corner.Parent =
+	main
 
 --------------------------------------------------
--- TÍTULO
+-- TITLE
 --------------------------------------------------
 
 local title =
@@ -368,19 +561,21 @@ title.Position =
 		5
 	)
 
-title.BackgroundTransparency = 1
+title.BackgroundTransparency =
+	1
 
 title.Text =
-	"Player ESP + Aimbot"
+	"Player ESP"
 
 title.TextColor3 =
-	Color3.fromRGB(
-		255,
-		255,
-		255
+	Color3.new(
+		1,
+		1,
+		1
 	)
 
-title.TextSize = 18
+title.TextSize =
+	18
 
 title.Font =
 	Enum.Font.GothamBold
@@ -388,187 +583,11 @@ title.Font =
 title.TextXAlignment =
 	Enum.TextXAlignment.Left
 
-title.Parent = main
+title.Parent =
+	main
 
 --------------------------------------------------
--- BOTÃO ESP
---------------------------------------------------
-
-local toggle =
-	Instance.new("TextButton")
-
-toggle.Size =
-	UDim2.fromOffset(
-		130,
-		32
-	)
-
-toggle.Position =
-	UDim2.fromOffset(
-		20,
-		50
-	)
-
-toggle.BorderSizePixel = 0
-
-toggle.Font =
-	Enum.Font.GothamBold
-
-toggle.TextSize = 14
-
-toggle.TextColor3 =
-	Color3.fromRGB(
-		255,
-		255,
-		255
-	)
-
-toggle.Parent = main
-
-local toggleCorner =
-	Instance.new("UICorner")
-
-toggleCorner.CornerRadius =
-	UDim.new(
-		0,
-		6
-	)
-
-toggleCorner.Parent = toggle
-
-local function updateToggle()
-
-	if config.Enabled then
-
-		toggle.Text =
-			"ESP: ON"
-
-		toggle.BackgroundColor3 =
-			Color3.fromRGB(
-				40,
-				150,
-				80
-			)
-
-	else
-
-		toggle.Text =
-			"ESP: OFF"
-
-		toggle.BackgroundColor3 =
-			Color3.fromRGB(
-				150,
-				50,
-				50
-			)
-
-	end
-end
-
-toggle.MouseButton1Click:Connect(
-	function()
-
-		config.Enabled =
-			not config.Enabled
-
-		updateToggle()
-
-	end
-)
-
-updateToggle()
-
---------------------------------------------------
--- BOTÃO AIMBOT
---------------------------------------------------
-
-local aimbotToggle =
-	Instance.new("TextButton")
-
-aimbotToggle.Size =
-	UDim2.fromOffset(
-		150,
-		32
-	)
-
-aimbotToggle.Position =
-	UDim2.fromOffset(
-		180,
-		50
-	)
-
-aimbotToggle.BorderSizePixel = 0
-
-aimbotToggle.Font =
-	Enum.Font.GothamBold
-
-aimbotToggle.TextSize = 14
-
-aimbotToggle.TextColor3 =
-	Color3.fromRGB(
-		255,
-		255,
-		255
-	)
-
-aimbotToggle.Parent = main
-
-local aimbotCorner =
-	Instance.new("UICorner")
-
-aimbotCorner.CornerRadius =
-	UDim.new(
-		0,
-		6
-	)
-
-aimbotCorner.Parent =
-	aimbotToggle
-
-local function updateAimbotToggle()
-
-	if config.AimbotEnabled then
-
-		aimbotToggle.Text =
-			"AIMBOT: ON"
-
-		aimbotToggle.BackgroundColor3 =
-			Color3.fromRGB(
-				40,
-				150,
-				80
-			)
-
-	else
-
-		aimbotToggle.Text =
-			"AIMBOT: OFF"
-
-		aimbotToggle.BackgroundColor3 =
-			Color3.fromRGB(
-				150,
-				50,
-				50
-			)
-
-	end
-end
-
-aimbotToggle.MouseButton1Click:Connect(
-	function()
-
-		config.AimbotEnabled =
-			not config.AimbotEnabled
-
-		updateAimbotToggle()
-
-	end
-)
-
-updateAimbotToggle()
-
---------------------------------------------------
--- FUNÇÃO PARA CRIAR LABEL
+-- LABEL
 --------------------------------------------------
 
 local function createLabel(
@@ -576,10 +595,10 @@ local function createLabel(
 	y
 )
 
-	local label =
+	local object =
 		Instance.new("TextLabel")
 
-	label.Size =
+	object.Size =
 		UDim2.new(
 			1,
 			-40,
@@ -587,39 +606,199 @@ local function createLabel(
 			22
 		)
 
-	label.Position =
+	object.Position =
 		UDim2.fromOffset(
 			20,
 			y
 		)
 
-	label.BackgroundTransparency = 1
+	object.BackgroundTransparency =
+		1
 
-	label.Text =
+	object.Text =
 		text
 
-	label.TextColor3 =
+	object.TextColor3 =
 		Color3.fromRGB(
 			220,
 			220,
 			220
 		)
 
-	label.TextSize = 13
-
-	label.Font =
+	object.Font =
 		Enum.Font.Gotham
 
-	label.TextXAlignment =
+	object.TextSize =
+		13
+
+	object.TextXAlignment =
 		Enum.TextXAlignment.Left
 
-	label.Parent = main
+	object.Parent =
+		main
 
-	return label
+	return object
 end
 
 --------------------------------------------------
--- CRIAR BARRA DE COR
+-- TOGGLE GENERATOR
+--------------------------------------------------
+
+local function createToggle(
+	text,
+	x,
+	callback
+)
+
+	local button =
+		Instance.new("TextButton")
+
+	button.Size =
+		UDim2.fromOffset(
+			150,
+			32
+		)
+
+	button.Position =
+		UDim2.fromOffset(
+			x,
+			50
+		)
+
+	button.BorderSizePixel =
+		0
+
+	button.Font =
+		Enum.Font.GothamBold
+
+	button.TextSize =
+		14
+
+	button.TextColor3 =
+		Color3.new(
+			1,
+			1,
+			1
+		)
+
+	button.Parent =
+		main
+
+	local c =
+		Instance.new("UICorner")
+
+	c.CornerRadius =
+		UDim.new(
+			0,
+			6
+		)
+
+	c.Parent =
+		button
+
+	local enabled = false
+
+	local function refresh()
+
+		button.Text =
+			text
+			.. (
+				enabled
+				and ": ON"
+				or ": OFF"
+			)
+
+		button.BackgroundColor3 =
+			enabled
+			and Color3.fromRGB(
+				40,
+				150,
+				80
+			)
+			or Color3.fromRGB(
+				150,
+				50,
+				50
+			)
+	end
+
+	button.MouseButton1Click:Connect(
+		function()
+
+			enabled =
+				not enabled
+
+			callback(enabled)
+
+			refresh()
+		end
+	)
+
+	refresh()
+
+	return button,
+		function(value)
+
+			enabled = value
+
+			refresh()
+		end
+end
+
+--------------------------------------------------
+-- ESP TOGGLE
+--------------------------------------------------
+
+local espButton =
+	createToggle(
+		"ESP",
+		20,
+
+		function(value)
+			config.ESPEnabled =
+				value
+		end
+	)
+
+--------------------------------------------------
+-- AIMBOT TOGGLE
+--------------------------------------------------
+
+local aimButton =
+	createToggle(
+		"AIMBOT",
+		200,
+
+		function(value)
+
+			config.AimbotEnabled =
+				value
+
+			if not value then
+				lockedTarget = nil
+			end
+		end
+	)
+
+--------------------------------------------------
+-- SET DEFAULT ESP ON
+--------------------------------------------------
+
+config.ESPEnabled =
+	true
+
+espButton.Text =
+	"ESP: ON"
+
+espButton.BackgroundColor3 =
+	Color3.fromRGB(
+		40,
+		150,
+		80
+	)
+
+--------------------------------------------------
+-- HUE SLIDER
 --------------------------------------------------
 
 local function createHueSlider(
@@ -645,9 +824,11 @@ local function createHueSlider(
 			y
 		)
 
-	bar.BorderSizePixel = 0
+	bar.BorderSizePixel =
+		0
 
-	bar.Parent = main
+	bar.Parent =
+		main
 
 	local gradient =
 		Instance.new("UIGradient")
@@ -657,74 +838,43 @@ local function createHueSlider(
 
 			ColorSequenceKeypoint.new(
 				0,
-				Color3.fromHSV(
-					0,
-					1,
-					1
-				)
+				Color3.fromHSV(0,1,1)
 			),
 
 			ColorSequenceKeypoint.new(
 				0.166,
-				Color3.fromHSV(
-					0.166,
-					1,
-					1
-				)
+				Color3.fromHSV(.166,1,1)
 			),
 
 			ColorSequenceKeypoint.new(
 				0.333,
-				Color3.fromHSV(
-					0.333,
-					1,
-					1
-				)
+				Color3.fromHSV(.333,1,1)
 			),
 
 			ColorSequenceKeypoint.new(
 				0.5,
-				Color3.fromHSV(
-					0.5,
-					1,
-					1
-				)
+				Color3.fromHSV(.5,1,1)
 			),
 
 			ColorSequenceKeypoint.new(
 				0.666,
-				Color3.fromHSV(
-					0.666,
-					1,
-					1
-				)
+				Color3.fromHSV(.666,1,1)
 			),
 
 			ColorSequenceKeypoint.new(
 				0.833,
-				Color3.fromHSV(
-					0.833,
-					1,
-					1
-				)
+				Color3.fromHSV(.833,1,1)
 			),
 
 			ColorSequenceKeypoint.new(
 				1,
-				Color3.fromHSV(
-					1,
-					1,
-					1
-				)
+				Color3.fromHSV(1,1,1)
 			)
 
 		})
 
-	gradient.Parent = bar
-
-	--------------------------------------------------
-	-- MARCADOR
-	--------------------------------------------------
+	gradient.Parent =
+		bar
 
 	local marker =
 		Instance.new("Frame")
@@ -750,33 +900,30 @@ local function createHueSlider(
 		)
 
 	marker.BackgroundColor3 =
-		Color3.fromRGB(
-			255,
-			255,
-			255
+		Color3.new(
+			1,
+			1,
+			1
 		)
 
-	marker.BorderSizePixel = 0
+	marker.BorderSizePixel =
+		0
 
-	marker.ZIndex = 5
+	marker.Parent =
+		bar
 
-	marker.Parent = bar
-
-	--------------------------------------------------
-	-- DRAG
-	--------------------------------------------------
-
-	local dragging = false
+	local dragging =
+		false
 
 	local function update(input)
 
-		local relative =
+		local x =
 			input.Position.X
 			- bar.AbsolutePosition.X
 
-		local percentage =
+		local value =
 			math.clamp(
-				relative
+				x
 				/ bar.AbsoluteSize.X,
 				0,
 				1
@@ -784,25 +931,26 @@ local function createHueSlider(
 
 		marker.Position =
 			UDim2.new(
-				percentage,
+				value,
 				0,
 				0.5,
 				0
 			)
 
-		callback(percentage)
+		callback(value)
 	end
 
 	bar.InputBegan:Connect(
 		function(input)
 
 			if input.UserInputType ==
-				Enum.UserInputType.MouseButton1 then
+				Enum.UserInputType.MouseButton1
+			then
 
-				dragging = true
+				dragging =
+					true
 
 				update(input)
-
 			end
 		end
 	)
@@ -812,10 +960,10 @@ local function createHueSlider(
 
 			if dragging
 				and input.UserInputType ==
-				Enum.UserInputType.MouseMovement then
+				Enum.UserInputType.MouseMovement
+			then
 
 				update(input)
-
 			end
 		end
 	)
@@ -824,23 +972,22 @@ local function createHueSlider(
 		function(input)
 
 			if input.UserInputType ==
-				Enum.UserInputType.MouseButton1 then
+				Enum.UserInputType.MouseButton1
+			then
 
-				dragging = false
-
+				dragging =
+					false
 			end
 		end
 	)
-
-	return bar
 end
 
 --------------------------------------------------
--- COR VISÍVEL
+-- VISIBLE COLOR
 --------------------------------------------------
 
 createLabel(
-	"Cor quando VISÍVEL",
+	"Cor - jogador visível",
 	100
 )
 
@@ -849,19 +996,17 @@ createHueSlider(
 	config.VisibleHue,
 
 	function(value)
-
 		config.VisibleHue =
 			value
-
 	end
 )
 
 --------------------------------------------------
--- COR ATRÁS DE PAREDE
+-- HIDDEN COLOR
 --------------------------------------------------
 
 createLabel(
-	"Cor atrás de PAREDE",
+	"Cor - atrás da parede",
 	165
 )
 
@@ -870,182 +1015,392 @@ createHueSlider(
 	config.HiddenHue,
 
 	function(value)
-
 		config.HiddenHue =
 			value
-
 	end
 )
 
 --------------------------------------------------
--- INTENSIDADE DO PREENCHIMENTO
+-- GENERIC SLIDER
 --------------------------------------------------
 
-local intensityLabel =
-	createLabel(
-		"Intensidade do preenchimento",
-		230
-	)
+local function createSlider(
+	labelText,
+	y,
+	minValue,
+	maxValue,
+	defaultValue,
+	callback,
+	format
+)
 
-local intensityBar =
-	Instance.new("Frame")
-
-intensityBar.Size =
-	UDim2.new(
-		1,
-		-40,
-		0,
-		18
-	)
-
-intensityBar.Position =
-	UDim2.fromOffset(
-		20,
-		258
-	)
-
-intensityBar.BackgroundColor3 =
-	Color3.fromRGB(
-		55,
-		55,
-		65
-	)
-
-intensityBar.BorderSizePixel = 0
-
-intensityBar.Parent = main
-
---------------------------------------------------
--- PREENCHIMENTO DA BARRA
---------------------------------------------------
-
-local fill =
-	Instance.new("Frame")
-
-fill.Size =
-	UDim2.new(
-		config.FillIntensity,
-		0,
-		1,
-		0
-	)
-
-fill.BackgroundColor3 =
-	Color3.fromRGB(
-		255,
-		255,
-		255
-	)
-
-fill.BorderSizePixel = 0
-
-fill.Parent = intensityBar
-
---------------------------------------------------
--- MARCADOR DA INTENSIDADE
---------------------------------------------------
-
-local intensityMarker =
-	Instance.new("Frame")
-
-intensityMarker.Size =
-	UDim2.fromOffset(
-		3,
-		26
-	)
-
-intensityMarker.AnchorPoint =
-	Vector2.new(
-		0.5,
-		0.5
-	)
-
-intensityMarker.Position =
-	UDim2.new(
-		config.FillIntensity,
-		0,
-		0.5,
-		0
-	)
-
-intensityMarker.BackgroundColor3 =
-	Color3.fromRGB(
-		255,
-		255,
-		255
-	)
-
-intensityMarker.BorderSizePixel = 0
-
-intensityMarker.Parent =
-	intensityBar
-
-local intensityDragging = false
-
-local function updateIntensity(input)
-
-	local relative =
-		input.Position.X
-		- intensityBar.AbsolutePosition.X
-
-	local value =
-		math.clamp(
-			relative
-				/ intensityBar.AbsoluteSize.X,
-			0,
-			1
+	local text =
+		createLabel(
+			"",
+			y
 		)
 
-	config.FillIntensity =
-		value
+	local bar =
+		Instance.new("Frame")
+
+	bar.Size =
+		UDim2.new(
+			1,
+			-40,
+			0,
+			18
+		)
+
+	bar.Position =
+		UDim2.fromOffset(
+			20,
+			y + 28
+		)
+
+	bar.BackgroundColor3 =
+		Color3.fromRGB(
+			55,
+			55,
+			65
+		)
+
+	bar.BorderSizePixel =
+		0
+
+	bar.Parent =
+		main
+
+	local percentage =
+		(defaultValue - minValue)
+		/ (maxValue - minValue)
+
+	local fill =
+		Instance.new("Frame")
 
 	fill.Size =
 		UDim2.new(
-			value,
+			percentage,
 			0,
 			1,
 			0
 		)
 
-	intensityMarker.Position =
+	fill.BackgroundColor3 =
+		Color3.fromRGB(
+			200,
+			200,
+			200
+		)
+
+	fill.BorderSizePixel =
+		0
+
+	fill.Parent =
+		bar
+
+	local marker =
+		Instance.new("Frame")
+
+	marker.Size =
+		UDim2.fromOffset(
+			3,
+			26
+		)
+
+	marker.AnchorPoint =
+		Vector2.new(
+			0.5,
+			0.5
+		)
+
+	marker.Position =
 		UDim2.new(
-			value,
+			percentage,
 			0,
 			0.5,
 			0
 		)
 
-	intensityLabel.Text =
-		"Intensidade do preenchimento: "
-		.. math.floor(
-			value * 100
-		)
-		.. "%"
+	marker.BackgroundColor3 =
+		Color3.new(1,1,1)
+
+	marker.BorderSizePixel =
+		0
+
+	marker.Parent =
+		bar
+
+	local dragging =
+		false
+
+	local function setValue(input)
+
+		local x =
+			input.Position.X
+			- bar.AbsolutePosition.X
+
+		local pct =
+			math.clamp(
+				x / bar.AbsoluteSize.X,
+				0,
+				1
+			)
+
+		local value =
+			minValue
+			+ (
+				maxValue - minValue
+			) * pct
+
+		fill.Size =
+			UDim2.new(
+				pct,
+				0,
+				1,
+				0
+			)
+
+		marker.Position =
+			UDim2.new(
+				pct,
+				0,
+				0.5,
+				0
+			)
+
+		text.Text =
+			labelText
+			.. ": "
+			.. format(value)
+
+		callback(value)
+	end
+
+	text.Text =
+		labelText
+		.. ": "
+		.. format(defaultValue)
+
+	bar.InputBegan:Connect(
+		function(input)
+
+			if input.UserInputType ==
+				Enum.UserInputType.MouseButton1
+			then
+
+				dragging = true
+
+				setValue(input)
+			end
+		end
+	)
+
+	UserInputService.InputChanged:Connect(
+		function(input)
+
+			if dragging
+				and input.UserInputType ==
+				Enum.UserInputType.MouseMovement
+			then
+
+				setValue(input)
+			end
+		end
+	)
+
+	UserInputService.InputEnded:Connect(
+		function(input)
+
+			if input.UserInputType ==
+				Enum.UserInputType.MouseButton1
+			then
+
+				dragging = false
+			end
+		end
+	)
 end
 
-intensityBar.InputBegan:Connect(
-	function(input)
+--------------------------------------------------
+-- FILL
+--------------------------------------------------
 
-		if input.UserInputType ==
-			Enum.UserInputType.MouseButton1 then
+createSlider(
+	"Preenchimento",
+	230,
+	0,
+	1,
+	config.FillIntensity,
 
-			intensityDragging = true
+	function(value)
+		config.FillIntensity =
+			value
+	end,
 
-			updateIntensity(input)
-
-		end
+	function(value)
+		return math.floor(
+			value * 100
+		) .. "%"
 	end
 )
 
-UserInputService.InputChanged:Connect(
-	function(input)
+--------------------------------------------------
+-- FOV
+--------------------------------------------------
 
-		if intensityDragging
-			and input.UserInputType ==
-			Enum.UserInputType.MouseMovement then
+createSlider(
+	"FOV",
+	295,
+	50,
+	500,
+	config.AimbotFOV,
 
-			updateIntensity(input)
+	function(value)
 
+		config.AimbotFOV =
+			math.floor(value)
+
+	end,
+
+	function(value)
+
+		return tostring(
+			math.floor(value)
+		)
+
+	end
+)
+
+--------------------------------------------------
+-- AIM SPEED
+--------------------------------------------------
+
+createSlider(
+	"Velocidade da mira",
+	360,
+	5,
+	50,
+	config.AimSpeed,
+
+	function(value)
+
+		config.AimSpeed =
+			value
+
+	end,
+
+	function(value)
+
+		return tostring(
+			math.floor(value)
+		)
+
+	end
+)
+
+--------------------------------------------------
+-- HINT
+--------------------------------------------------
+
+local hint =
+	createLabel(
+		"INSERT = menu | RMB = aimbot",
+		435
+	)
+
+hint.TextColor3 =
+	Color3.fromRGB(
+		140,
+		140,
+		150
+	)
+
+--------------------------------------------------
+-- FOV CIRCLE
+--------------------------------------------------
+
+local fovCircle =
+	Instance.new("Frame")
+
+fovCircle.Name =
+	"FOVCircle"
+
+fovCircle.AnchorPoint =
+	Vector2.new(
+		0.5,
+		0.5
+	)
+
+fovCircle.BackgroundTransparency =
+	1
+
+fovCircle.Position =
+	UDim2.fromScale(
+		0.5,
+		0.5
+	)
+
+fovCircle.ZIndex =
+	100
+
+fovCircle.Parent =
+	gui
+
+local fovCorner =
+	Instance.new("UICorner")
+
+fovCorner.CornerRadius =
+	UDim.new(
+		1,
+		0
+	)
+
+fovCorner.Parent =
+	fovCircle
+
+local fovStroke =
+	Instance.new("UIStroke")
+
+fovStroke.Thickness =
+	1
+
+fovStroke.Transparency =
+	0.35
+
+fovStroke.Color =
+	Color3.fromRGB(
+		255,
+		255,
+		255
+	)
+
+fovStroke.Parent =
+	fovCircle
+
+--------------------------------------------------
+-- INSERT
+--------------------------------------------------
+
+main.Visible =
+	false
+
+UserInputService.InputBegan:Connect(
+	function(input, processed)
+
+		if input.KeyCode ==
+			Enum.KeyCode.Insert
+		then
+
+			main.Visible =
+				not main.Visible
+		end
+
+		if input.UserInputType ==
+			Enum.UserInputType.MouseButton2
+		then
+
+			rightMouseDown =
+				true
 		end
 	end
 )
@@ -1054,110 +1409,25 @@ UserInputService.InputEnded:Connect(
 	function(input)
 
 		if input.UserInputType ==
-			Enum.UserInputType.MouseButton1 then
+			Enum.UserInputType.MouseButton2
+		then
 
-			intensityDragging = false
+			rightMouseDown =
+				false
 
-		end
-	end
-)
-
-intensityLabel.Text =
-	"Intensidade do preenchimento: "
-	.. math.floor(
-		config.FillIntensity * 100
-	)
-	.. "%"
-
---------------------------------------------------
--- INFO AIMBOT
---------------------------------------------------
-
-local aimbotInfo =
-	createLabel(
-		"Aimbot: cabeça | somente players visíveis",
-		295
-	)
-
-aimbotInfo.TextColor3 =
-	Color3.fromRGB(
-		160,
-		160,
-		170
-	)
-
---------------------------------------------------
--- TEXTO INSERT
---------------------------------------------------
-
-local hint =
-	Instance.new("TextLabel")
-
-hint.Size =
-	UDim2.new(
-		1,
-		-40,
-		0,
-		25
-	)
-
-hint.Position =
-	UDim2.fromOffset(
-		20,
-		335
-	)
-
-hint.BackgroundTransparency = 1
-
-hint.Text =
-	"INSERT - Abrir / Fechar"
-
-hint.TextColor3 =
-	Color3.fromRGB(
-		130,
-		130,
-		140
-	)
-
-hint.TextSize = 12
-
-hint.Font =
-	Enum.Font.Gotham
-
-hint.Parent = main
-
---------------------------------------------------
--- MENU COMEÇA FECHADO
---------------------------------------------------
-
-main.Visible = false
-
---------------------------------------------------
--- INSERT ABRE / FECHA
---------------------------------------------------
-
-UserInputService.InputBegan:Connect(
-	function(input, processed)
-
-		if processed then
-			return
-		end
-
-		if input.KeyCode ==
-			Enum.KeyCode.Insert then
-
-			main.Visible =
-				not main.Visible
-
+			lockedTarget =
+				nil
 		end
 	end
 )
 
 --------------------------------------------------
--- ARRASTAR JANELA
+-- DRAG WINDOW
 --------------------------------------------------
 
-local draggingWindow = false
+local windowDragging =
+	false
+
 local dragStart
 local startPosition
 
@@ -1165,16 +1435,17 @@ title.InputBegan:Connect(
 	function(input)
 
 		if input.UserInputType ==
-			Enum.UserInputType.MouseButton1 then
+			Enum.UserInputType.MouseButton1
+		then
 
-			draggingWindow = true
+			windowDragging =
+				true
 
 			dragStart =
 				input.Position
 
 			startPosition =
 				main.Position
-
 		end
 	end
 )
@@ -1182,9 +1453,10 @@ title.InputBegan:Connect(
 UserInputService.InputChanged:Connect(
 	function(input)
 
-		if draggingWindow
+		if windowDragging
 			and input.UserInputType ==
-			Enum.UserInputType.MouseMovement then
+			Enum.UserInputType.MouseMovement
+		then
 
 			local delta =
 				input.Position
@@ -1192,6 +1464,7 @@ UserInputService.InputChanged:Connect(
 
 			main.Position =
 				UDim2.new(
+
 					startPosition.X.Scale,
 					startPosition.X.Offset
 						+ delta.X,
@@ -1200,7 +1473,6 @@ UserInputService.InputChanged:Connect(
 					startPosition.Y.Offset
 						+ delta.Y
 				)
-
 		end
 	end
 )
@@ -1209,183 +1481,116 @@ UserInputService.InputEnded:Connect(
 	function(input)
 
 		if input.UserInputType ==
-			Enum.UserInputType.MouseButton1 then
+			Enum.UserInputType.MouseButton1
+		then
 
-			draggingWindow = false
-
+			windowDragging =
+				false
 		end
 	end
 )
 
 --------------------------------------------------
--- CRIAR ESP DOS PLAYERS EXISTENTES
+-- UPDATE ESP
 --------------------------------------------------
 
-for _, player in ipairs(
-	Players:GetPlayers()
-) do
+local function updateESP()
 
-	createHighlight(player)
+	local visibleColor =
+		getVisibleColor()
 
-end
+	local hiddenColor =
+		getHiddenColor()
 
---------------------------------------------------
--- NOVOS PLAYERS
---------------------------------------------------
+	for player, highlight in pairs(
+		highlights
+	) do
 
-Players.PlayerAdded:Connect(
-	createHighlight
-)
+		if not highlight.Parent then
+			continue
+		end
 
-Players.PlayerRemoving:Connect(
-	removeHighlight
-)
+		highlight.Enabled =
+			config.ESPEnabled
 
---------------------------------------------------
--- ATUALIZAR AIMBOT
---------------------------------------------------
+		if not config.ESPEnabled then
+			continue
+		end
 
-local function updateAimbot()
+		highlight.FillTransparency =
+			1 - config.FillIntensity
 
-	if not config.AimbotEnabled then
-		return
-	end
+		highlight.OutlineTransparency =
+			config.OutlineTransparency
 
-	-- não mover a câmera enquanto mexe no menu
-	if main.Visible then
-		return
-	end
+		if isPlayerVisible(player) then
 
-	camera =
-		workspace.CurrentCamera
+			highlight.FillColor =
+				visibleColor
 
-	if not camera then
-		return
-	end
+			highlight.OutlineColor =
+				visibleColor
 
-	local targetHead =
-		getClosestAimbotTarget()
+		else
 
-	if not targetHead then
-		return
-	end
+			highlight.FillColor =
+				hiddenColor
 
-	local cameraPosition =
-		camera.CFrame.Position
-
-	local targetCFrame =
-		CFrame.lookAt(
-			cameraPosition,
-			targetHead.Position
-		)
-
-	--------------------------------------------------
-	-- 0 = SNAP
-	--------------------------------------------------
-
-	if config.AimbotSmoothness <= 0 then
-
-		camera.CFrame =
-			targetCFrame
-
-	else
-
-		camera.CFrame =
-			camera.CFrame:Lerp(
-				targetCFrame,
-				math.clamp(
-					config.AimbotSmoothness,
-					0,
-					1
-				)
-			)
-
+			highlight.OutlineColor =
+				hiddenColor
+		end
 	end
 end
 
 --------------------------------------------------
--- LOOP PRINCIPAL
+-- MAIN LOOP
 --------------------------------------------------
 
 RunService.RenderStepped:Connect(
-	function()
+	function(dt)
 
 		camera =
 			workspace.CurrentCamera
 
 		--------------------------------------------------
+		-- FOV
+		--------------------------------------------------
+
+		local diameter =
+			config.AimbotFOV * 2
+
+		fovCircle.Size =
+			UDim2.fromOffset(
+				diameter,
+				diameter
+			)
+
+		fovCircle.Visible =
+			config.ShowFOV
+			and config.AimbotEnabled
+
+		--------------------------------------------------
 		-- AIMBOT
 		--------------------------------------------------
 
-		updateAimbot()
+		updateAimbot(
+			dt,
+			main.Visible
+		)
 
 		--------------------------------------------------
-		-- ESP
+		-- ESP COM THROTTLE
 		--------------------------------------------------
 
-		for player, highlight
-			in pairs(highlights)
-		do
+		espAccumulator += dt
 
-			if highlight
-				and highlight.Parent
-			then
+		if espAccumulator >=
+			config.ESPUpdateInterval
+		then
 
-				------------------------------------------
-				-- ESP OFF
-				------------------------------------------
+			espAccumulator = 0
 
-				if not config.Enabled then
-
-					highlight.Enabled =
-						false
-
-					continue
-
-				end
-
-				highlight.Enabled =
-					true
-
-				------------------------------------------
-				-- INTENSIDADE
-				------------------------------------------
-
-				highlight.FillTransparency =
-					1
-					- config.FillIntensity
-
-				highlight.OutlineTransparency =
-					config.OutlineTransparency
-
-				------------------------------------------
-				-- COR
-				------------------------------------------
-
-				if isPlayerVisible(player) then
-
-					local color =
-						getVisibleColor()
-
-					highlight.FillColor =
-						color
-
-					highlight.OutlineColor =
-						color
-
-				else
-
-					local color =
-						getHiddenColor()
-
-					highlight.FillColor =
-						color
-
-					highlight.OutlineColor =
-						color
-
-				end
-			end
+			updateESP()
 		end
 	end
 )
