@@ -10,17 +10,40 @@ local camera = workspace.CurrentCamera
 --------------------------------------------------
 
 local config = {
+	-- ESP
 	Enabled = true,
 
 	VisibleHue = 0.33, -- Verde
 	HiddenHue = 0,     -- Vermelho
 
 	FillIntensity = 0.35,
+	OutlineTransparency = 0,
 
-	OutlineTransparency = 0
+	-- AIMBOT
+	AimbotEnabled = false,
+
+	-- Quanto maior, mais rápido trava no alvo.
+	-- 0 = instantâneo
+	AimbotSmoothness = 0.18,
+
+	-- Distância em pixels do centro da tela
+	-- para selecionar um alvo
+	AimbotFOV = 250
 }
 
 local highlights = {}
+
+--------------------------------------------------
+-- LIMPAR GUI ANTIGA CASO EXECUTE NOVAMENTE
+--------------------------------------------------
+
+local playerGui = localPlayer:WaitForChild("PlayerGui")
+
+local oldGui = playerGui:FindFirstChild("ESPSettings")
+
+if oldGui then
+	oldGui:Destroy()
+end
 
 --------------------------------------------------
 -- CORES
@@ -43,7 +66,7 @@ local function getHiddenColor()
 end
 
 --------------------------------------------------
--- HIGHLIGHT
+-- CRIAR HIGHLIGHT
 --------------------------------------------------
 
 local function createHighlight(player)
@@ -84,16 +107,22 @@ local function createHighlight(player)
 	player.CharacterAdded:Connect(apply)
 end
 
+--------------------------------------------------
+-- REMOVER HIGHLIGHT
+--------------------------------------------------
+
 local function removeHighlight(player)
 
 	if highlights[player] then
+
 		highlights[player]:Destroy()
 		highlights[player] = nil
+
 	end
 end
 
 --------------------------------------------------
--- VISIBILIDADE
+-- VERIFICAR SE PLAYER ESTÁ VISÍVEL
 --------------------------------------------------
 
 local function isPlayerVisible(player)
@@ -130,17 +159,19 @@ local function isPlayerVisible(player)
 	params.FilterType =
 		Enum.RaycastFilterType.Exclude
 
-	local ignore = {}
+	local ignoreList = {}
 
 	if localPlayer.Character then
+
 		table.insert(
-			ignore,
+			ignoreList,
 			localPlayer.Character
 		)
+
 	end
 
 	params.FilterDescendantsInstances =
-		ignore
+		ignoreList
 
 	params.IgnoreWater = true
 
@@ -151,34 +182,114 @@ local function isPlayerVisible(player)
 			params
 		)
 
+	-- Não bateu em nada
 	if not result then
 		return true
 	end
 
+	-- Bateu no próprio player alvo
 	if result.Instance:IsDescendantOf(character) then
 		return true
 	end
 
+	-- Parede / objeto bloqueando
 	return false
 end
 
 --------------------------------------------------
--- CRIAR PLAYERS
+-- AIMBOT - ENCONTRAR PLAYER MAIS PRÓXIMO
+-- DO CENTRO DA TELA
 --------------------------------------------------
 
-for _, player in ipairs(
-	Players:GetPlayers()
-) do
-	createHighlight(player)
+local function getClosestAimbotTarget()
+
+	camera = workspace.CurrentCamera
+
+	if not camera then
+		return nil
+	end
+
+	local viewportSize =
+		camera.ViewportSize
+
+	local screenCenter =
+		Vector2.new(
+			viewportSize.X / 2,
+			viewportSize.Y / 2
+		)
+
+	local closestHead = nil
+	local closestDistance =
+		config.AimbotFOV
+
+	for _, player in ipairs(
+		Players:GetPlayers()
+	) do
+
+		if player ~= localPlayer then
+
+			local character =
+				player.Character
+
+			if character then
+
+				local humanoid =
+					character:FindFirstChildOfClass(
+						"Humanoid"
+					)
+
+				local head =
+					character:FindFirstChild(
+						"Head"
+					)
+
+				if humanoid
+				and humanoid.Health > 0
+				and head
+				and isPlayerVisible(player)
+				then
+
+					local screenPosition,
+						onScreen =
+						camera:WorldToViewportPoint(
+							head.Position
+						)
+
+					if onScreen
+						and screenPosition.Z > 0
+					then
+
+						local position2D =
+							Vector2.new(
+								screenPosition.X,
+								screenPosition.Y
+							)
+
+						local distance =
+							(
+								position2D
+								- screenCenter
+							).Magnitude
+
+						if distance
+							< closestDistance
+						then
+
+							closestDistance =
+								distance
+
+							closestHead =
+								head
+
+						end
+					end
+				end
+			end
+		end
+	end
+
+	return closestHead
 end
-
-Players.PlayerAdded:Connect(
-	createHighlight
-)
-
-Players.PlayerRemoving:Connect(
-	removeHighlight
-)
 
 --------------------------------------------------
 -- GUI
@@ -189,9 +300,11 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "ESPSettings"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
-gui.Parent =
-	localPlayer:WaitForChild("PlayerGui")
 
+gui.Parent = playerGui
+
+--------------------------------------------------
+-- JANELA PRINCIPAL
 --------------------------------------------------
 
 local main = Instance.new("Frame")
@@ -201,7 +314,7 @@ main.Name = "Main"
 main.Size =
 	UDim2.fromOffset(
 		350,
-		330
+		390
 	)
 
 main.Position =
@@ -209,7 +322,7 @@ main.Position =
 		0.5,
 		-175,
 		0.5,
-		-165
+		-195
 	)
 
 main.BackgroundColor3 =
@@ -222,10 +335,6 @@ main.BackgroundColor3 =
 main.BorderSizePixel = 0
 
 main.Parent = gui
-
---------------------------------------------------
--- CANTOS
---------------------------------------------------
 
 local corner =
 	Instance.new("UICorner")
@@ -262,7 +371,7 @@ title.Position =
 title.BackgroundTransparency = 1
 
 title.Text =
-	"Player ESP"
+	"Player ESP + Aimbot"
 
 title.TextColor3 =
 	Color3.fromRGB(
@@ -282,7 +391,7 @@ title.TextXAlignment =
 title.Parent = main
 
 --------------------------------------------------
--- BOTÃO ENABLE
+-- BOTÃO ESP
 --------------------------------------------------
 
 local toggle =
@@ -290,7 +399,7 @@ local toggle =
 
 toggle.Size =
 	UDim2.fromOffset(
-		120,
+		130,
 		32
 	)
 
@@ -370,7 +479,96 @@ toggle.MouseButton1Click:Connect(
 updateToggle()
 
 --------------------------------------------------
--- FUNÇÃO TEXTO
+-- BOTÃO AIMBOT
+--------------------------------------------------
+
+local aimbotToggle =
+	Instance.new("TextButton")
+
+aimbotToggle.Size =
+	UDim2.fromOffset(
+		150,
+		32
+	)
+
+aimbotToggle.Position =
+	UDim2.fromOffset(
+		180,
+		50
+	)
+
+aimbotToggle.BorderSizePixel = 0
+
+aimbotToggle.Font =
+	Enum.Font.GothamBold
+
+aimbotToggle.TextSize = 14
+
+aimbotToggle.TextColor3 =
+	Color3.fromRGB(
+		255,
+		255,
+		255
+	)
+
+aimbotToggle.Parent = main
+
+local aimbotCorner =
+	Instance.new("UICorner")
+
+aimbotCorner.CornerRadius =
+	UDim.new(
+		0,
+		6
+	)
+
+aimbotCorner.Parent =
+	aimbotToggle
+
+local function updateAimbotToggle()
+
+	if config.AimbotEnabled then
+
+		aimbotToggle.Text =
+			"AIMBOT: ON"
+
+		aimbotToggle.BackgroundColor3 =
+			Color3.fromRGB(
+				40,
+				150,
+				80
+			)
+
+	else
+
+		aimbotToggle.Text =
+			"AIMBOT: OFF"
+
+		aimbotToggle.BackgroundColor3 =
+			Color3.fromRGB(
+				150,
+				50,
+				50
+			)
+
+	end
+end
+
+aimbotToggle.MouseButton1Click:Connect(
+	function()
+
+		config.AimbotEnabled =
+			not config.AimbotEnabled
+
+		updateAimbotToggle()
+
+	end
+)
+
+updateAimbotToggle()
+
+--------------------------------------------------
+-- FUNÇÃO PARA CRIAR LABEL
 --------------------------------------------------
 
 local function createLabel(
@@ -421,7 +619,7 @@ local function createLabel(
 end
 
 --------------------------------------------------
--- CRIAR BARRA DE HUE
+-- CRIAR BARRA DE COR
 --------------------------------------------------
 
 local function createHueSlider(
@@ -459,7 +657,11 @@ local function createHueSlider(
 
 			ColorSequenceKeypoint.new(
 				0,
-				Color3.fromHSV(0, 1, 1)
+				Color3.fromHSV(
+					0,
+					1,
+					1
+				)
 			),
 
 			ColorSequenceKeypoint.new(
@@ -521,7 +723,7 @@ local function createHueSlider(
 	gradient.Parent = bar
 
 	--------------------------------------------------
-	-- LINHA DO SLIDER
+	-- MARCADOR
 	--------------------------------------------------
 
 	local marker =
@@ -594,13 +796,11 @@ local function createHueSlider(
 	bar.InputBegan:Connect(
 		function(input)
 
-			if
-				input.UserInputType
-				==
-				Enum.UserInputType.MouseButton1
-			then
+			if input.UserInputType ==
+				Enum.UserInputType.MouseButton1 then
 
 				dragging = true
+
 				update(input)
 
 			end
@@ -611,10 +811,8 @@ local function createHueSlider(
 		function(input)
 
 			if dragging
-			and input.UserInputType
-			==
-			Enum.UserInputType.MouseMovement
-			then
+				and input.UserInputType ==
+				Enum.UserInputType.MouseMovement then
 
 				update(input)
 
@@ -625,11 +823,8 @@ local function createHueSlider(
 	UserInputService.InputEnded:Connect(
 		function(input)
 
-			if
-				input.UserInputType
-				==
-				Enum.UserInputType.MouseButton1
-			then
+			if input.UserInputType ==
+				Enum.UserInputType.MouseButton1 then
 
 				dragging = false
 
@@ -654,7 +849,10 @@ createHueSlider(
 	config.VisibleHue,
 
 	function(value)
-		config.VisibleHue = value
+
+		config.VisibleHue =
+			value
+
 	end
 )
 
@@ -672,12 +870,15 @@ createHueSlider(
 	config.HiddenHue,
 
 	function(value)
-		config.HiddenHue = value
+
+		config.HiddenHue =
+			value
+
 	end
 )
 
 --------------------------------------------------
--- INTENSIDADE
+-- INTENSIDADE DO PREENCHIMENTO
 --------------------------------------------------
 
 local intensityLabel =
@@ -685,8 +886,6 @@ local intensityLabel =
 		"Intensidade do preenchimento",
 		230
 	)
-
---------------------------------------------------
 
 local intensityBar =
 	Instance.new("Frame")
@@ -717,6 +916,8 @@ intensityBar.BorderSizePixel = 0
 intensityBar.Parent = main
 
 --------------------------------------------------
+-- PREENCHIMENTO DA BARRA
+--------------------------------------------------
 
 local fill =
 	Instance.new("Frame")
@@ -740,6 +941,8 @@ fill.BorderSizePixel = 0
 
 fill.Parent = intensityBar
 
+--------------------------------------------------
+-- MARCADOR DA INTENSIDADE
 --------------------------------------------------
 
 local intensityMarker =
@@ -777,10 +980,6 @@ intensityMarker.BorderSizePixel = 0
 intensityMarker.Parent =
 	intensityBar
 
---------------------------------------------------
--- INTENSIDADE DRAG
---------------------------------------------------
-
 local intensityDragging = false
 
 local function updateIntensity(input)
@@ -797,7 +996,8 @@ local function updateIntensity(input)
 			1
 		)
 
-	config.FillIntensity = value
+	config.FillIntensity =
+		value
 
 	fill.Size =
 		UDim2.new(
@@ -817,18 +1017,17 @@ local function updateIntensity(input)
 
 	intensityLabel.Text =
 		"Intensidade do preenchimento: "
-		.. math.floor(value * 100)
+		.. math.floor(
+			value * 100
+		)
 		.. "%"
 end
 
 intensityBar.InputBegan:Connect(
 	function(input)
 
-		if
-			input.UserInputType
-			==
-			Enum.UserInputType.MouseButton1
-		then
+		if input.UserInputType ==
+			Enum.UserInputType.MouseButton1 then
 
 			intensityDragging = true
 
@@ -842,10 +1041,8 @@ UserInputService.InputChanged:Connect(
 	function(input)
 
 		if intensityDragging
-		and input.UserInputType
-		==
-		Enum.UserInputType.MouseMovement
-		then
+			and input.UserInputType ==
+			Enum.UserInputType.MouseMovement then
 
 			updateIntensity(input)
 
@@ -856,11 +1053,8 @@ UserInputService.InputChanged:Connect(
 UserInputService.InputEnded:Connect(
 	function(input)
 
-		if
-			input.UserInputType
-			==
-			Enum.UserInputType.MouseButton1
-		then
+		if input.UserInputType ==
+			Enum.UserInputType.MouseButton1 then
 
 			intensityDragging = false
 
@@ -874,6 +1068,23 @@ intensityLabel.Text =
 		config.FillIntensity * 100
 	)
 	.. "%"
+
+--------------------------------------------------
+-- INFO AIMBOT
+--------------------------------------------------
+
+local aimbotInfo =
+	createLabel(
+		"Aimbot: cabeça | somente players visíveis",
+		295
+	)
+
+aimbotInfo.TextColor3 =
+	Color3.fromRGB(
+		160,
+		160,
+		170
+	)
 
 --------------------------------------------------
 -- TEXTO INSERT
@@ -893,7 +1104,7 @@ hint.Size =
 hint.Position =
 	UDim2.fromOffset(
 		20,
-		295
+		335
 	)
 
 hint.BackgroundTransparency = 1
@@ -922,7 +1133,7 @@ hint.Parent = main
 main.Visible = false
 
 --------------------------------------------------
--- INSERT
+-- INSERT ABRE / FECHA
 --------------------------------------------------
 
 UserInputService.InputBegan:Connect(
@@ -972,8 +1183,8 @@ UserInputService.InputChanged:Connect(
 	function(input)
 
 		if draggingWindow
-		and input.UserInputType ==
-		Enum.UserInputType.MouseMovement then
+			and input.UserInputType ==
+			Enum.UserInputType.MouseMovement then
 
 			local delta =
 				input.Position
@@ -1007,7 +1218,93 @@ UserInputService.InputEnded:Connect(
 )
 
 --------------------------------------------------
--- LOOP DO ESP
+-- CRIAR ESP DOS PLAYERS EXISTENTES
+--------------------------------------------------
+
+for _, player in ipairs(
+	Players:GetPlayers()
+) do
+
+	createHighlight(player)
+
+end
+
+--------------------------------------------------
+-- NOVOS PLAYERS
+--------------------------------------------------
+
+Players.PlayerAdded:Connect(
+	createHighlight
+)
+
+Players.PlayerRemoving:Connect(
+	removeHighlight
+)
+
+--------------------------------------------------
+-- ATUALIZAR AIMBOT
+--------------------------------------------------
+
+local function updateAimbot()
+
+	if not config.AimbotEnabled then
+		return
+	end
+
+	-- não mover a câmera enquanto mexe no menu
+	if main.Visible then
+		return
+	end
+
+	camera =
+		workspace.CurrentCamera
+
+	if not camera then
+		return
+	end
+
+	local targetHead =
+		getClosestAimbotTarget()
+
+	if not targetHead then
+		return
+	end
+
+	local cameraPosition =
+		camera.CFrame.Position
+
+	local targetCFrame =
+		CFrame.lookAt(
+			cameraPosition,
+			targetHead.Position
+		)
+
+	--------------------------------------------------
+	-- 0 = SNAP
+	--------------------------------------------------
+
+	if config.AimbotSmoothness <= 0 then
+
+		camera.CFrame =
+			targetCFrame
+
+	else
+
+		camera.CFrame =
+			camera.CFrame:Lerp(
+				targetCFrame,
+				math.clamp(
+					config.AimbotSmoothness,
+					0,
+					1
+				)
+			)
+
+	end
+end
+
+--------------------------------------------------
+-- LOOP PRINCIPAL
 --------------------------------------------------
 
 RunService.RenderStepped:Connect(
@@ -1016,31 +1313,43 @@ RunService.RenderStepped:Connect(
 		camera =
 			workspace.CurrentCamera
 
+		--------------------------------------------------
+		-- AIMBOT
+		--------------------------------------------------
+
+		updateAimbot()
+
+		--------------------------------------------------
+		-- ESP
+		--------------------------------------------------
+
 		for player, highlight
 			in pairs(highlights)
 		do
 
 			if highlight
-			and highlight.Parent
+				and highlight.Parent
 			then
 
-				----------------------------------
+				------------------------------------------
 				-- ESP OFF
-				----------------------------------
+				------------------------------------------
 
 				if not config.Enabled then
 
-					highlight.Enabled = false
+					highlight.Enabled =
+						false
 
 					continue
 
 				end
 
-				highlight.Enabled = true
+				highlight.Enabled =
+					true
 
-				----------------------------------
-				-- TRANSPARÊNCIA
-				----------------------------------
+				------------------------------------------
+				-- INTENSIDADE
+				------------------------------------------
 
 				highlight.FillTransparency =
 					1
@@ -1049,9 +1358,9 @@ RunService.RenderStepped:Connect(
 				highlight.OutlineTransparency =
 					config.OutlineTransparency
 
-				----------------------------------
-				-- CORES
-				----------------------------------
+				------------------------------------------
+				-- COR
+				------------------------------------------
 
 				if isPlayerVisible(player) then
 
