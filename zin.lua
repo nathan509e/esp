@@ -15,6 +15,7 @@ local config = {
 
 	-- ESP
 	ESPEnabled = true,
+	NameESPEnabled = true,
 
 	VisibleHue = 0.33,
 	HiddenHue = 0,
@@ -47,6 +48,7 @@ local config = {
 --------------------------------------------------
 
 local highlights = {}
+local nameTags = {}
 
 local rightMouseDown = false
 local lockedTarget = nil
@@ -122,6 +124,79 @@ local function getHiddenColor()
 end
 
 --------------------------------------------------
+-- NAME ESP
+--------------------------------------------------
+
+local function createNameTag(player, character)
+
+	if player == localPlayer then
+		return
+	end
+
+	if nameTags[player] then
+		nameTags[player]:Destroy()
+		nameTags[player] = nil
+	end
+
+	local head =
+		character:FindFirstChild("Head")
+		or character:WaitForChild("Head", 5)
+
+	if not head then
+		return
+	end
+
+	local billboard =
+		Instance.new("BillboardGui")
+
+	billboard.Name =
+		"PlayerNameESP"
+
+	billboard.Adornee =
+		head
+
+	billboard.Size =
+		UDim2.fromOffset(
+			220,
+			40
+		)
+
+	billboard.StudsOffset =
+		Vector3.new(
+			0,
+			2.2,
+			0
+		)
+
+	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 2000
+	billboard.Enabled = config.NameESPEnabled
+	billboard.Parent = playerGui
+
+	local text =
+		Instance.new("TextLabel")
+
+	text.Size =
+		UDim2.fromScale(1, 1)
+
+	text.BackgroundTransparency = 1
+	text.Text = player.Name
+
+	text.TextColor3 =
+		Color3.fromRGB(255, 255, 255)
+
+	text.TextStrokeColor3 =
+		Color3.fromRGB(0, 0, 0)
+
+	text.TextStrokeTransparency = 0
+	text.Font = Enum.Font.GothamBold
+	text.TextSize = 14
+	text.Parent = billboard
+
+	nameTags[player] = billboard
+end
+
+--------------------------------------------------
 -- ESP
 --------------------------------------------------
 
@@ -160,6 +235,11 @@ local function createHighlight(player)
 
 		highlights[player] =
 			highlight
+
+		createNameTag(
+			player,
+			character
+		)
 	end
 
 	if player.Character then
@@ -178,6 +258,13 @@ local function removeHighlight(player)
 		highlights[player]:Destroy()
 
 		highlights[player] = nil
+	end
+
+	if nameTags[player] then
+
+		nameTags[player]:Destroy()
+		nameTags[player] = nil
+
 	end
 
 	if lockedTarget == player then
@@ -749,7 +836,7 @@ end
 -- ESP TOGGLE
 --------------------------------------------------
 
-local espButton =
+local espButton, setESPButton =
 	createToggle(
 		"ESP",
 		20,
@@ -764,10 +851,10 @@ local espButton =
 -- AIMBOT TOGGLE
 --------------------------------------------------
 
-local aimButton =
+local aimButton, setAimButton =
 	createToggle(
 		"AIMBOT",
-		200,
+		132,
 
 		function(value)
 
@@ -781,21 +868,51 @@ local aimButton =
 	)
 
 --------------------------------------------------
--- SET DEFAULT ESP ON
+-- NAME ESP TOGGLE
 --------------------------------------------------
 
-config.ESPEnabled =
-	true
+local nameButton, setNameButton =
+	createToggle(
+		"NAMES",
+		244,
 
-espButton.Text =
-	"ESP: ON"
+		function(value)
 
-espButton.BackgroundColor3 =
-	Color3.fromRGB(
-		40,
-		150,
-		80
+			config.NameESPEnabled =
+				value
+
+			for _, billboard in pairs(nameTags) do
+
+				if billboard and billboard.Parent then
+					billboard.Enabled = value
+				end
+			end
+		end
 	)
+
+--------------------------------------------------
+-- AJUSTAR OS 3 BOTÕES NA MESMA LINHA
+--------------------------------------------------
+
+espButton.Size = UDim2.fromOffset(100, 32)
+aimButton.Size = UDim2.fromOffset(100, 32)
+nameButton.Size = UDim2.fromOffset(100, 32)
+
+espButton.Position = UDim2.fromOffset(20, 50)
+aimButton.Position = UDim2.fromOffset(132, 50)
+nameButton.Position = UDim2.fromOffset(244, 50)
+
+--------------------------------------------------
+-- ESTADOS INICIAIS
+--------------------------------------------------
+
+config.ESPEnabled = true
+config.NameESPEnabled = true
+config.AimbotEnabled = false
+
+setESPButton(true)
+setAimButton(false)
+setNameButton(true)
 
 --------------------------------------------------
 -- HUE SLIDER
