@@ -128,6 +128,80 @@ local function getHiddenColor()
 end
 
 --------------------------------------------------
+-- NOCLIP
+--------------------------------------------------
+
+local function applyNoclip()
+
+	local character = localPlayer.Character
+
+	if not character then
+		return
+	end
+
+	for _, obj in ipairs(character:GetDescendants()) do
+
+		if obj:IsA("BasePart") then
+
+			if originalCollision[obj] == nil then
+				originalCollision[obj] = obj.CanCollide
+			end
+
+			obj.CanCollide = false
+		end
+	end
+end
+
+local function restoreNoclip()
+
+	for part, originalState in pairs(originalCollision) do
+
+		if part and part.Parent then
+			part.CanCollide = originalState
+		end
+	end
+
+	table.clear(originalCollision)
+end
+
+local function setNoclip(value)
+
+	config.NoclipEnabled = value
+
+	if noclipConnection then
+		noclipConnection:Disconnect()
+		noclipConnection = nil
+	end
+
+	if value then
+
+		applyNoclip()
+
+		noclipConnection =
+			RunService.Stepped:Connect(function()
+
+				if config.NoclipEnabled then
+					applyNoclip()
+				end
+			end)
+
+	else
+
+		restoreNoclip()
+	end
+end
+
+localPlayer.CharacterAdded:Connect(function()
+
+	table.clear(originalCollision)
+
+	if config.NoclipEnabled then
+		task.wait(0.2)
+		applyNoclip()
+	end
+end)
+
+--------------------------------------------------
 -- NAME ESP
 --------------------------------------------------
 
@@ -275,100 +349,6 @@ local function removeHighlight(player)
 		lockedTarget = nil
 	end
 end
-
---------------------------------------------------
--- NOCLIP
---------------------------------------------------
-
-local function applyNoclip()
-
-	local character =
-		localPlayer.Character
-
-	if not character then
-		return
-	end
-
-	for _, obj in ipairs(
-		character:GetDescendants()
-	) do
-
-		if obj:IsA("BasePart") then
-
-			if originalCollision[obj] == nil then
-				originalCollision[obj] =
-					obj.CanCollide
-			end
-
-			obj.CanCollide = false
-		end
-	end
-end
-
-local function restoreNoclipCollision()
-
-	for part, originalState in pairs(
-		originalCollision
-	) do
-
-		if part
-			and part.Parent
-		then
-
-			part.CanCollide =
-				originalState
-		end
-	end
-
-	table.clear(originalCollision)
-end
-
-local function setNoclipEnabled(value)
-
-	config.NoclipEnabled =
-		value
-
-	if noclipConnection then
-
-		noclipConnection:Disconnect()
-		noclipConnection = nil
-	end
-
-	if value then
-
-		applyNoclip()
-
-		noclipConnection =
-			RunService.Stepped:Connect(
-				function()
-
-					if config.NoclipEnabled then
-						applyNoclip()
-					end
-				end
-			)
-
-	else
-
-		restoreNoclipCollision()
-	end
-end
-
-localPlayer.CharacterAdded:Connect(
-	function()
-
-		table.clear(
-			originalCollision
-		)
-
-		if config.NoclipEnabled then
-
-			task.wait(0.2)
-			applyNoclip()
-
-		end
-	end
-)
 
 --------------------------------------------------
 -- CHARACTER VALIDATION
@@ -989,34 +969,86 @@ local nameButton, setNameButton =
 	)
 
 --------------------------------------------------
+-- AJUSTAR OS 3 BOTÕES NA MESMA LINHA
+--------------------------------------------------
+
+espButton.Size = UDim2.fromOffset(100, 32)
+aimButton.Size = UDim2.fromOffset(100, 32)
+nameButton.Size = UDim2.fromOffset(100, 32)
+
+espButton.Position = UDim2.fromOffset(20, 50)
+aimButton.Position = UDim2.fromOffset(132, 50)
+nameButton.Position = UDim2.fromOffset(244, 50)
+
+--------------------------------------------------
 -- NOCLIP TOGGLE
 --------------------------------------------------
 
-local noclipButton, setNoclipButton =
-	createToggle(
-		"NOCLIP",
-		266,
+local noclipButton =
+	Instance.new("TextButton")
 
-		function(value)
+noclipButton.Size =
+	UDim2.fromOffset(78, 26)
 
-			setNoclipEnabled(value)
-
-		end
+noclipButton.Position =
+	UDim2.new(
+		1,
+		-88,
+		0,
+		8
 	)
 
---------------------------------------------------
--- AJUSTAR OS 4 BOTÕES NA MESMA LINHA
---------------------------------------------------
+noclipButton.BorderSizePixel = 0
+noclipButton.Font = Enum.Font.GothamBold
+noclipButton.TextSize = 11
+noclipButton.TextColor3 = Color3.new(1, 1, 1)
+noclipButton.Parent = main
 
-espButton.Size = UDim2.fromOffset(76, 32)
-aimButton.Size = UDim2.fromOffset(76, 32)
-nameButton.Size = UDim2.fromOffset(76, 32)
-noclipButton.Size = UDim2.fromOffset(76, 32)
+local noclipCorner =
+	Instance.new("UICorner")
 
-espButton.Position = UDim2.fromOffset(20, 50)
-aimButton.Position = UDim2.fromOffset(102, 50)
-nameButton.Position = UDim2.fromOffset(184, 50)
-noclipButton.Position = UDim2.fromOffset(266, 50)
+noclipCorner.CornerRadius =
+	UDim.new(0, 6)
+
+noclipCorner.Parent =
+	noclipButton
+
+local function updateNoclipButton()
+
+	if config.NoclipEnabled then
+
+		noclipButton.Text = "NOCLIP ON"
+
+		noclipButton.BackgroundColor3 =
+			Color3.fromRGB(
+				40,
+				150,
+				80
+			)
+
+	else
+
+		noclipButton.Text = "NOCLIP OFF"
+
+		noclipButton.BackgroundColor3 =
+			Color3.fromRGB(
+				150,
+				50,
+				50
+			)
+	end
+end
+
+noclipButton.MouseButton1Click:Connect(function()
+
+	setNoclip(
+		not config.NoclipEnabled
+	)
+
+	updateNoclipButton()
+end)
+
+updateNoclipButton()
 
 --------------------------------------------------
 -- ESTADOS INICIAIS
@@ -1025,12 +1057,10 @@ noclipButton.Position = UDim2.fromOffset(266, 50)
 config.ESPEnabled = true
 config.NameESPEnabled = true
 config.AimbotEnabled = false
-config.NoclipEnabled = false
 
 setESPButton(true)
 setAimButton(false)
 setNameButton(true)
-setNoclipButton(false)
 
 --------------------------------------------------
 -- HUE SLIDER
@@ -1539,7 +1569,7 @@ createSlider(
 
 local hint =
 	createLabel(
-		"INSERT = menu | RMB = aimbot | N = noclip",
+		"INSERT = menu | RMB = aimbot",
 		435
 	)
 
@@ -1635,16 +1665,11 @@ UserInputService.InputBegan:Connect(
 				Enum.KeyCode.N
 		then
 
-			local newState =
+			setNoclip(
 				not config.NoclipEnabled
-
-			setNoclipEnabled(
-				newState
 			)
 
-			setNoclipButton(
-				newState
-			)
+			updateNoclipButton()
 		end
 
 		if input.UserInputType ==
