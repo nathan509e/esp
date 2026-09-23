@@ -671,7 +671,7 @@ local main =
 main.Size =
 	UDim2.fromOffset(
 		370,
-		500
+		700
 	)
 
 main.Position =
@@ -1579,6 +1579,901 @@ hint.TextColor3 =
 		140,
 		150
 	)
+
+
+--------------------------------------------------
+-- SPECTATOR / TARGET CAMERA
+--------------------------------------------------
+
+local spectatorTargetIndex = 1
+local spectatorTarget = nil
+local spectatorEnabled = false
+local spectatorFullscreen = true
+local spectatorConnection = nil
+
+local PIP_WORLD_RADIUS = 160
+local PIP_MAX_PARTS = 300
+local PIP_WORLD_REFRESH = 0.75
+
+--------------------------------------------------
+-- SPECTATOR UI - MESMO GUI
+--------------------------------------------------
+
+local spectatorSection =
+	Instance.new("TextLabel")
+
+spectatorSection.Size =
+	UDim2.new(
+		1,
+		-40,
+		0,
+		22
+	)
+
+spectatorSection.Position =
+	UDim2.fromOffset(
+		20,
+		470
+	)
+
+spectatorSection.BackgroundTransparency = 1
+spectatorSection.Text = "SPECTATOR / TARGET CAMERA"
+spectatorSection.TextColor3 = Color3.fromRGB(220, 220, 220)
+spectatorSection.Font = Enum.Font.GothamBold
+spectatorSection.TextSize = 13
+spectatorSection.TextXAlignment = Enum.TextXAlignment.Left
+spectatorSection.Parent = main
+
+local spectatorTargetLabel =
+	Instance.new("TextLabel")
+
+spectatorTargetLabel.Size =
+	UDim2.new(
+		1,
+		-40,
+		0,
+		28
+	)
+
+spectatorTargetLabel.Position =
+	UDim2.fromOffset(
+		20,
+		495
+	)
+
+spectatorTargetLabel.BackgroundTransparency = 1
+spectatorTargetLabel.Text = "Nenhum jogador"
+spectatorTargetLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
+spectatorTargetLabel.Font = Enum.Font.GothamBold
+spectatorTargetLabel.TextSize = 13
+spectatorTargetLabel.Parent = main
+
+local function createSpectatorButton(
+	textValue,
+	x,
+	y,
+	width,
+	height
+)
+
+	local button =
+		Instance.new("TextButton")
+
+	button.Size =
+		UDim2.fromOffset(
+			width,
+			height
+		)
+
+	button.Position =
+		UDim2.fromOffset(
+			x,
+			y
+		)
+
+	button.BackgroundColor3 =
+		Color3.fromRGB(
+			45,
+			45,
+			55
+		)
+
+	button.BorderSizePixel = 0
+	button.Text = textValue
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.Font = Enum.Font.GothamBold
+	button.TextSize = 12
+	button.Parent = main
+
+	local buttonCorner =
+		Instance.new("UICorner")
+
+	buttonCorner.CornerRadius =
+		UDim.new(0, 6)
+
+	buttonCorner.Parent =
+		button
+
+	return button
+end
+
+local spectatorPreviousButton =
+	createSpectatorButton(
+		"<",
+		20,
+		530,
+		50,
+		32
+	)
+
+local spectatorStartButton =
+	createSpectatorButton(
+		"SPECTATE",
+		80,
+		530,
+		200,
+		32
+	)
+
+local spectatorNextButton =
+	createSpectatorButton(
+		">",
+		290,
+		530,
+		50,
+		32
+	)
+
+local spectatorModeButton =
+	createSpectatorButton(
+		"MODO: TELA CHEIA",
+		20,
+		572,
+		320,
+		32
+	)
+
+local spectatorStopButton =
+	createSpectatorButton(
+		"STOP / VOLTAR",
+		20,
+		614,
+		320,
+		32
+	)
+
+spectatorStopButton.BackgroundColor3 =
+	Color3.fromRGB(
+		130,
+		45,
+		45
+	)
+
+--------------------------------------------------
+-- PIP - MESMO SCREEN GUI
+--------------------------------------------------
+
+local spectatorPIP =
+	Instance.new("Frame")
+
+spectatorPIP.Name =
+	"SpectatorPIP"
+
+spectatorPIP.Size =
+	UDim2.fromOffset(
+		420,
+		260
+	)
+
+spectatorPIP.Position =
+	UDim2.new(
+		1,
+		-440,
+		0.5,
+		-130
+	)
+
+spectatorPIP.BackgroundColor3 =
+	Color3.fromRGB(
+		10,
+		10,
+		12
+	)
+
+spectatorPIP.BorderSizePixel = 0
+spectatorPIP.Visible = false
+spectatorPIP.Parent = gui
+
+local spectatorPIPCorner =
+	Instance.new("UICorner")
+
+spectatorPIPCorner.CornerRadius =
+	UDim.new(0, 8)
+
+spectatorPIPCorner.Parent =
+	spectatorPIP
+
+local spectatorPIPTitle =
+	Instance.new("TextLabel")
+
+spectatorPIPTitle.Size =
+	UDim2.new(
+		1,
+		-16,
+		0,
+		28
+	)
+
+spectatorPIPTitle.Position =
+	UDim2.fromOffset(
+		8,
+		2
+	)
+
+spectatorPIPTitle.BackgroundTransparency = 1
+spectatorPIPTitle.Text = "TARGET CAM"
+spectatorPIPTitle.TextColor3 = Color3.new(1, 1, 1)
+spectatorPIPTitle.Font = Enum.Font.GothamBold
+spectatorPIPTitle.TextSize = 13
+spectatorPIPTitle.TextXAlignment = Enum.TextXAlignment.Left
+spectatorPIPTitle.Parent = spectatorPIP
+
+local spectatorViewport =
+	Instance.new("ViewportFrame")
+
+spectatorViewport.Size =
+	UDim2.new(
+		1,
+		-12,
+		1,
+		-40
+	)
+
+spectatorViewport.Position =
+	UDim2.fromOffset(
+		6,
+		32
+	)
+
+spectatorViewport.BackgroundColor3 =
+	Color3.fromRGB(
+		15,
+		15,
+		18
+	)
+
+spectatorViewport.BorderSizePixel = 0
+spectatorViewport.Ambient = Color3.fromRGB(180, 180, 180)
+spectatorViewport.LightColor = Color3.new(1, 1, 1)
+spectatorViewport.LightDirection = Vector3.new(-1, -1, -1)
+spectatorViewport.Parent = spectatorPIP
+
+local spectatorViewportCorner =
+	Instance.new("UICorner")
+
+spectatorViewportCorner.CornerRadius =
+	UDim.new(0, 5)
+
+spectatorViewportCorner.Parent =
+	spectatorViewport
+
+local spectatorWorld =
+	Instance.new("WorldModel")
+
+spectatorWorld.Name =
+	"SpectatorWorld"
+
+spectatorWorld.Parent =
+	spectatorViewport
+
+local spectatorWorldFolder =
+	Instance.new("Folder")
+
+spectatorWorldFolder.Name =
+	"Environment"
+
+spectatorWorldFolder.Parent =
+	spectatorWorld
+
+local spectatorPIPCamera =
+	Instance.new("Camera")
+
+spectatorPIPCamera.Name =
+	"SpectatorCamera"
+
+spectatorPIPCamera.FieldOfView = 70
+spectatorPIPCamera.Parent = spectatorViewport
+
+spectatorViewport.CurrentCamera =
+	spectatorPIPCamera
+
+--------------------------------------------------
+-- TARGETS
+--------------------------------------------------
+
+local function getSpectatorTargets()
+
+	local targets = {}
+
+	for _, player in ipairs(
+		Players:GetPlayers()
+	) do
+
+		if player ~= localPlayer then
+
+			local character =
+				player.Character
+
+			if character then
+
+				local humanoid =
+					character:FindFirstChildOfClass(
+						"Humanoid"
+					)
+
+				if humanoid
+					and humanoid.Health > 0
+				then
+
+					table.insert(
+						targets,
+						player
+					)
+				end
+			end
+		end
+	end
+
+	table.sort(
+		targets,
+		function(a, b)
+			return a.Name < b.Name
+		end
+	)
+
+	return targets
+end
+
+local function restoreOwnCamera()
+
+	local currentCamera =
+		workspace.CurrentCamera
+
+	local character =
+		localPlayer.Character
+
+	if not character then
+		return
+	end
+
+	local humanoid =
+		character:FindFirstChildOfClass(
+			"Humanoid"
+		)
+
+	if humanoid then
+
+		currentCamera.CameraType =
+			Enum.CameraType.Custom
+
+		currentCamera.CameraSubject =
+			humanoid
+	end
+end
+
+--------------------------------------------------
+-- PIP WORLD
+--------------------------------------------------
+
+local pipOverlapParams =
+	OverlapParams.new()
+
+pipOverlapParams.FilterType =
+	Enum.RaycastFilterType.Exclude
+
+pipOverlapParams.MaxParts =
+	PIP_MAX_PARTS
+
+local function clearSpectatorWorld()
+
+	for _, obj in ipairs(
+		spectatorWorldFolder:GetChildren()
+	) do
+
+		obj:Destroy()
+	end
+end
+
+local function cloneSpectatorPart(part)
+
+	if not part:IsA("BasePart") then
+		return
+	end
+
+	if part.Transparency >= 1 then
+		return
+	end
+
+	local oldArchivable =
+		part.Archivable
+
+	part.Archivable =
+		true
+
+	local success, clone =
+		pcall(function()
+			return part:Clone()
+		end)
+
+	part.Archivable =
+		oldArchivable
+
+	if not success
+		or not clone
+	then
+
+		return
+	end
+
+	for _, obj in ipairs(
+		clone:GetDescendants()
+	) do
+
+		if obj:IsA("Script")
+			or obj:IsA("LocalScript")
+			or obj:IsA("Highlight")
+		then
+
+			obj:Destroy()
+		end
+	end
+
+	clone.Anchored = true
+	clone.CanCollide = false
+	clone.CanTouch = false
+	clone.CanQuery = false
+	clone.Parent = spectatorWorldFolder
+end
+
+local function refreshSpectatorWorld()
+
+	if not spectatorEnabled
+		or spectatorFullscreen
+		or not spectatorTarget
+	then
+
+		return
+	end
+
+	local character =
+		spectatorTarget.Character
+
+	if not character then
+		return
+	end
+
+	local head =
+		character:FindFirstChild(
+			"Head"
+		)
+
+	if not head then
+		return
+	end
+
+	clearSpectatorWorld()
+
+	local exclude = {}
+
+	for _, player in ipairs(
+		Players:GetPlayers()
+	) do
+
+		if player.Character then
+
+			table.insert(
+				exclude,
+				player.Character
+			)
+		end
+	end
+
+	pipOverlapParams.FilterDescendantsInstances =
+		exclude
+
+	local parts =
+		workspace:GetPartBoundsInRadius(
+			head.Position,
+			PIP_WORLD_RADIUS,
+			pipOverlapParams
+		)
+
+	local count = 0
+
+	for _, part in ipairs(parts) do
+
+		count += 1
+
+		if count > PIP_MAX_PARTS then
+			break
+		end
+
+		cloneSpectatorPart(
+			part
+		)
+	end
+end
+
+--------------------------------------------------
+-- STOP SPECTATOR
+--------------------------------------------------
+
+local function stopSpectator()
+
+	spectatorEnabled = false
+
+	if spectatorConnection then
+
+		spectatorConnection:Disconnect()
+		spectatorConnection = nil
+	end
+
+	spectatorPIP.Visible = false
+
+	clearSpectatorWorld()
+
+	restoreOwnCamera()
+
+	spectatorStartButton.Text =
+		"SPECTATE"
+
+	spectatorStartButton.BackgroundColor3 =
+		Color3.fromRGB(
+			45,
+			45,
+			55
+		)
+end
+
+--------------------------------------------------
+-- START SPECTATOR
+--------------------------------------------------
+
+local function startSpectator(player)
+
+	if not player then
+		return false
+	end
+
+	local character =
+		player.Character
+
+	if not character then
+		return false
+	end
+
+	local humanoid =
+		character:FindFirstChildOfClass(
+			"Humanoid"
+		)
+
+	local head =
+		character:FindFirstChild(
+			"Head"
+		)
+
+	if not humanoid
+		or humanoid.Health <= 0
+		or not head
+	then
+
+		return false
+	end
+
+	if spectatorConnection then
+
+		spectatorConnection:Disconnect()
+		spectatorConnection = nil
+	end
+
+	spectatorTarget =
+		player
+
+	spectatorEnabled =
+		true
+
+	spectatorPIPTitle.Text =
+		"TARGET CAM - "
+		.. player.DisplayName
+
+	if spectatorFullscreen then
+
+		spectatorPIP.Visible =
+			false
+
+	else
+
+		restoreOwnCamera()
+
+		spectatorPIP.Visible =
+			true
+
+		refreshSpectatorWorld()
+	end
+
+	local worldRefreshTimer = 0
+
+	spectatorConnection =
+		RunService.RenderStepped:Connect(
+			function(dt)
+
+				if not spectatorEnabled
+					or not spectatorTarget
+				then
+
+					return
+				end
+
+				local targetCharacter =
+					spectatorTarget.Character
+
+				if not targetCharacter then
+
+					stopSpectator()
+					return
+				end
+
+				local targetHumanoid =
+					targetCharacter:FindFirstChildOfClass(
+						"Humanoid"
+					)
+
+				local targetHead =
+					targetCharacter:FindFirstChild(
+						"Head"
+					)
+
+				if not targetHumanoid
+					or targetHumanoid.Health <= 0
+					or not targetHead
+				then
+
+					stopSpectator()
+					return
+				end
+
+				local forward =
+					targetHead.CFrame.LookVector
+
+				local cameraPosition =
+					targetHead.Position
+					+ forward * 0.8
+					+ Vector3.new(
+						0,
+						0.15,
+						0
+					)
+
+				local targetCameraCFrame =
+					CFrame.lookAt(
+						cameraPosition,
+						cameraPosition + forward
+					)
+
+				if spectatorFullscreen then
+
+					spectatorPIP.Visible =
+						false
+
+					local currentCamera =
+						workspace.CurrentCamera
+
+					currentCamera.CameraType =
+						Enum.CameraType.Scriptable
+
+					currentCamera.CFrame =
+						targetCameraCFrame
+
+				else
+
+					spectatorPIP.Visible =
+						true
+
+					if workspace.CurrentCamera.CameraType ==
+						Enum.CameraType.Scriptable
+					then
+
+						restoreOwnCamera()
+					end
+
+					spectatorPIPCamera.CFrame =
+						targetCameraCFrame
+
+					worldRefreshTimer += dt
+
+					if worldRefreshTimer >=
+						PIP_WORLD_REFRESH
+					then
+
+						worldRefreshTimer = 0
+						refreshSpectatorWorld()
+					end
+				end
+			end
+		)
+
+	return true
+end
+
+--------------------------------------------------
+-- UPDATE SPECTATOR TARGET
+--------------------------------------------------
+
+local function updateSpectatorTarget()
+
+	local targets =
+		getSpectatorTargets()
+
+	if #targets == 0 then
+
+		spectatorTarget = nil
+		spectatorTargetLabel.Text =
+			"Nenhum jogador disponível"
+
+		return
+	end
+
+	spectatorTargetIndex =
+		math.clamp(
+			spectatorTargetIndex,
+			1,
+			#targets
+		)
+
+	spectatorTarget =
+		targets[
+			spectatorTargetIndex
+		]
+
+	spectatorTargetLabel.Text =
+		spectatorTarget.DisplayName
+		.. "  (@"
+		.. spectatorTarget.Name
+		.. ")"
+
+	if spectatorEnabled then
+
+		startSpectator(
+			spectatorTarget
+		)
+	end
+end
+
+--------------------------------------------------
+-- SPECTATOR BUTTON EVENTS
+--------------------------------------------------
+
+spectatorPreviousButton.MouseButton1Click:Connect(
+	function()
+
+		local targets =
+			getSpectatorTargets()
+
+		if #targets == 0 then
+			updateSpectatorTarget()
+			return
+		end
+
+		spectatorTargetIndex -= 1
+
+		if spectatorTargetIndex < 1 then
+
+			spectatorTargetIndex =
+				#targets
+		end
+
+		updateSpectatorTarget()
+	end
+)
+
+spectatorNextButton.MouseButton1Click:Connect(
+	function()
+
+		local targets =
+			getSpectatorTargets()
+
+		if #targets == 0 then
+			updateSpectatorTarget()
+			return
+		end
+
+		spectatorTargetIndex += 1
+
+		if spectatorTargetIndex >
+			#targets
+		then
+
+			spectatorTargetIndex = 1
+		end
+
+		updateSpectatorTarget()
+	end
+)
+
+spectatorStartButton.MouseButton1Click:Connect(
+	function()
+
+		if not spectatorTarget then
+			updateSpectatorTarget()
+		end
+
+		if startSpectator(
+			spectatorTarget
+		) then
+
+			spectatorStartButton.Text =
+				"SPECTATING..."
+
+			spectatorStartButton.BackgroundColor3 =
+				Color3.fromRGB(
+					40,
+					140,
+					75
+				)
+		end
+	end
+)
+
+spectatorModeButton.MouseButton1Click:Connect(
+	function()
+
+		spectatorFullscreen =
+			not spectatorFullscreen
+
+		if spectatorFullscreen then
+
+			spectatorModeButton.Text =
+				"MODO: TELA CHEIA"
+
+		else
+
+			spectatorModeButton.Text =
+				"MODO: JANELA"
+		end
+
+		if spectatorEnabled
+			and spectatorTarget
+		then
+
+			startSpectator(
+				spectatorTarget
+			)
+		end
+	end
+)
+
+spectatorStopButton.MouseButton1Click:Connect(
+	function()
+
+		stopSpectator()
+	end
+)
+
+Players.PlayerRemoving:Connect(
+	function(player)
+
+		if player ==
+			spectatorTarget
+		then
+
+			stopSpectator()
+			task.wait()
+			updateSpectatorTarget()
+		end
+	end
+)
+
+updateSpectatorTarget()
 
 --------------------------------------------------
 -- FOV CIRCLE
