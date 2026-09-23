@@ -7,6 +7,16 @@ local playerGui = localPlayer:WaitForChild("PlayerGui")
 
 local camera = workspace.CurrentCamera
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+
+local noclipEnabled = false
+local originalCollision = {}
+local noclipConnection = nil
+
 --------------------------------------------------
 -- CONFIG
 --------------------------------------------------
@@ -1694,6 +1704,137 @@ RunService.RenderStepped:Connect(
 			dt,
 			main.Visible
 		)
+		--------------------------------------------------
+-- SALVAR / DESATIVAR COLISÃO
+--------------------------------------------------
+
+local function applyNoclip(character)
+
+	for _, obj in ipairs(character:GetDescendants()) do
+
+		if obj:IsA("BasePart") then
+
+			if originalCollision[obj] == nil then
+				originalCollision[obj] = obj.CanCollide
+			end
+
+			obj.CanCollide = false
+		end
+	end
+end
+
+--------------------------------------------------
+-- RESTAURAR COLISÃO
+--------------------------------------------------
+
+local function restoreCollision()
+
+	for part, originalState in pairs(originalCollision) do
+
+		if part and part.Parent then
+			part.CanCollide = originalState
+		end
+	end
+
+	table.clear(originalCollision)
+end
+
+--------------------------------------------------
+-- LIGAR
+--------------------------------------------------
+
+local function enableNoclip()
+
+	if noclipEnabled then
+		return
+	end
+
+	noclipEnabled = true
+
+	local character =
+		player.Character
+
+	if character then
+		applyNoclip(character)
+	end
+
+	noclipConnection =
+		RunService.Stepped:Connect(function()
+
+			local currentCharacter =
+				player.Character
+
+			if currentCharacter then
+				applyNoclip(currentCharacter)
+			end
+		end)
+
+	print("NOCLIP: ON")
+end
+
+--------------------------------------------------
+-- DESLIGAR
+--------------------------------------------------
+
+local function disableNoclip()
+
+	if not noclipEnabled then
+		return
+	end
+
+	noclipEnabled = false
+
+	if noclipConnection then
+		noclipConnection:Disconnect()
+		noclipConnection = nil
+	end
+
+	restoreCollision()
+
+	print("NOCLIP: OFF")
+end
+
+--------------------------------------------------
+-- TOGGLE
+--------------------------------------------------
+
+local function toggleNoclip()
+
+	if noclipEnabled then
+		disableNoclip()
+	else
+		enableNoclip()
+	end
+end
+
+--------------------------------------------------
+-- TECLA N
+--------------------------------------------------
+
+UserInputService.InputBegan:Connect(function(input, processed)
+
+	if processed then
+		return
+	end
+
+	if input.KeyCode == Enum.KeyCode.N then
+		toggleNoclip()
+	end
+end)
+
+--------------------------------------------------
+-- RESPAWN
+--------------------------------------------------
+
+player.CharacterAdded:Connect(function(character)
+
+	originalCollision = {}
+
+	if noclipEnabled then
+		task.wait(0.3)
+		applyNoclip(character)
+	end
+end)
 
 		--------------------------------------------------
 		-- ESP COM THROTTLE
