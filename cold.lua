@@ -1925,6 +1925,23 @@ local function f44(p71)
 end
 
 local function f45(p72)
+  if not p72 then
+    return
+  end
+
+  for _, drawingObject in pairs(p72) do
+    if type(drawingObject) == "table" then
+      for _, nestedDrawing in pairs(drawingObject) do
+        pcall(function()
+          nestedDrawing.Visible = false
+        end)
+      end
+    else
+      pcall(function()
+        drawingObject.Visible = false
+      end)
+    end
+  end
 end
 
 local f46
@@ -3115,9 +3132,7 @@ table.insert(v3.connections, playerRemoving:Connect(function(p88)
   local v228 = v3.playerDrawings[p88]
 
   if v228 then
-    for key10, value85 in pairs(v228) do
-    end
-
+    f50(v228)
     v3.playerDrawings[p88] = nil
   end
 end))
