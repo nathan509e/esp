@@ -1929,18 +1929,22 @@ local function f45(p72)
     return
   end
 
-  for _, drawingObject in pairs(p72) do
-    if type(drawingObject) == "table" then
-      for _, nestedDrawing in pairs(drawingObject) do
-        pcall(function()
-          nestedDrawing.Visible = false
-        end)
-      end
-    else
-      pcall(function()
-        drawingObject.Visible = false
-      end)
+  -- Esta função é usada pelo fluxo normal quando Skeleton/Chams
+  -- não devem aparecer. Portanto, ela limpa SOMENTE esses elementos.
+  for i = 1, #v170 do
+    local bone = p72["bone" .. i]
+    if bone then
+      bone.Visible = false
     end
+
+    local cham = p72["cham" .. i]
+    if cham then
+      cham.Visible = false
+    end
+  end
+
+  if p72.chamFill then
+    p72.chamFill.Visible = false
   end
 end
 
@@ -2140,7 +2144,27 @@ local function f50(p85)
     return
   end
 
-  for key9, value30 in pairs(p85) do
+  -- Limpeza total e imediata do ESP desse jogador.
+  -- Não remove os Drawing objects; apenas os oculta para reutilização.
+  local direct = {
+    "box", "outline", "name", "weapon", "tracer",
+    "hpBack", "hpFill", "chamFill"
+  }
+
+  for i = 1, #direct do
+    local obj = p85[direct[i]]
+    if obj then
+      obj.Visible = false
+    end
+  end
+
+  if p85.corners then
+    for i = 1, #p85.corners do
+      local corner = p85.corners[i]
+      if corner then
+        corner.Visible = false
+      end
+    end
   end
 
   if f45 then
@@ -2470,7 +2494,7 @@ local function f51()
               end
             end
 
-            if tracersEnabled and magnitude10 <= tracerDistance then
+            if tracersEnabled and v202 and magnitude10 <= tracerDistance then
               local vector4 = Vector2.new(
                 math.clamp(v196.X, 0, viewportSize2.X), math.clamp(v196.Y, 0, viewportSize2.Y)
               )
