@@ -1,4 +1,3 @@
-```
 local players = game:GetService("Players")
 local replicatedStorage = game:GetService("ReplicatedStorage")
 local runService = game:GetService("RunService")
@@ -3209,4 +3208,3 @@ library:OnUnload(function()
 end)
 
 v3.lastResult = "ready"
-```
