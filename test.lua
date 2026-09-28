@@ -1925,27 +1925,6 @@ local function f44(p71)
 end
 
 local function f45(p72)
-  if not p72 then
-    return
-  end
-
-  -- Esta função é usada pelo fluxo normal quando Skeleton/Chams
-  -- não devem aparecer. Portanto, ela limpa SOMENTE esses elementos.
-  for i = 1, #v170 do
-    local bone = p72["bone" .. i]
-    if bone then
-      bone.Visible = false
-    end
-
-    local cham = p72["cham" .. i]
-    if cham then
-      cham.Visible = false
-    end
-  end
-
-  if p72.chamFill then
-    p72.chamFill.Visible = false
-  end
 end
 
 local f46
@@ -2144,27 +2123,7 @@ local function f50(p85)
     return
   end
 
-  -- Limpeza total e imediata do ESP desse jogador.
-  -- Não remove os Drawing objects; apenas os oculta para reutilização.
-  local direct = {
-    "box", "outline", "name", "weapon", "tracer",
-    "hpBack", "hpFill", "chamFill"
-  }
-
-  for i = 1, #direct do
-    local obj = p85[direct[i]]
-    if obj then
-      obj.Visible = false
-    end
-  end
-
-  if p85.corners then
-    for i = 1, #p85.corners do
-      local corner = p85.corners[i]
-      if corner then
-        corner.Visible = false
-      end
-    end
+  for key9, value30 in pairs(p85) do
   end
 
   if f45 then
@@ -2179,24 +2138,23 @@ local function f51()
     return
   else
     local viewportSize2 = currentCamera.ViewportSize
-    local screenCenter = Vector2.new(viewportSize2.X * 0.5, viewportSize2.Y * 0.5)
-    local screenBottom = Vector2.new(screenCenter.X, viewportSize2.Y - 4)
-    local now = os.clock()
 
     if v164 then
-      v164.Position = screenCenter
+      v164.Position = Vector2.new(viewportSize2.X * 0.5, viewportSize2.Y * 0.5)
       v164.Radius = v3.fovRadius
       v164.Color = v3.fovColor or v163.accent
       v164.Visible = v3.active and v3.showFov and v3.silentAim
     end
 
     if v165 then
-      v165.Position = screenCenter
+      v165.Position = Vector2.new(viewportSize2.X * 0.5, viewportSize2.Y * 0.5)
       v165.Radius = v3.triggerRadius
       v165.Color = v3.triggerFovColor or v163.on
 
       local active = v3.active
-      local triggerbot = active and v3.showFov and v3.triggerbot
+
+      local triggerbot = active
+      triggerbot = active and v3.showFov and v3.triggerbot
 
       if v3.profile == "legit" and v3.silentAim then
         triggerbot = false
@@ -2213,7 +2171,7 @@ local function f51()
     if v3.profile == "legit" and v189 and v189.visible then
       if v3.legitLockTarget ~= v189.player then
         v3.legitLockTarget = v189.player
-        v3.legitLockSince = now
+        v3.legitLockSince = os.clock()
       end
     else
       v3.legitLockTarget = nil
@@ -2221,8 +2179,8 @@ local function f51()
     end
 
     if v189 and v166 then
-      if now >= v3.nextAssessmentAt or v3.assessedTarget ~= v189.player then
-        v3.nextAssessmentAt = now + 0.1
+      if os.clock() >= v3.nextAssessmentAt or v3.assessedTarget ~= v189.player then
+        v3.nextAssessmentAt = os.clock() + 0.1
         v3.assessedTarget = v189.player
 
         local v190 = f9()
@@ -2242,8 +2200,7 @@ local function f51()
       v3.visualShotReady = shotAssessment and shotAssessment.canFire or false
 
       if v3.profile == "legit" and shotAssessment then
-        local currentTool = f9()
-        local v192, v193 = f20(v189, shotAssessment, f22(currentTool), currentCamera.CFrame.LookVector)
+        local v192, v193 = f20(v189, shotAssessment, f22(f9()), currentCamera.CFrame.LookVector)
         v3.visualShotReady = v192
 
         if not v192 then
@@ -2270,23 +2227,8 @@ local function f51()
     end
 
     local esp = v3.esp or v3.tracers
-    local localOrigin = f6()
-    local playerList = players:GetPlayers()
-    local espDistance = v3.espDistance
-    local tracerDistance = v3.tracerDistance
-    local visibilityEnabled = v3.visibility
-    local espEnabled = v3.esp
-    local tracersEnabled = v3.tracers
-    local showNames = v3.showNames
-    local showDistance = v3.showDistance
-    local showWeaponEnabled = v3.showWeapon
-    local showHealthBar = v3.showHealthBar
-    local espBoxEnabled = v3.espBox == true
-    local espCornerEnabled = v3.espCorner == true
-    local espChamsEnabled = v3.espChams == true
-    local espSkeletonEnabled = v3.espSkeleton == true
 
-    for index26, value33 in ipairs(playerList) do
+    for index26, value33 in ipairs(players:GetPlayers()) do
       local v194 = v3.playerDrawings[value33]
 
       if not esp or not f8(value33) then
@@ -2301,24 +2243,24 @@ local function f51()
           and (v195:FindFirstChild("HumanoidRootPart") or v195.PrimaryPart
             or v195:FindFirstChildWhichIsA("BasePart"))
 
-        local head2 = v195 and (v195:FindFirstChild("Head") or humanoidRootPart4)
+        local head2 = v195
+        head2 = v195 and (v195:FindFirstChild("Head") or humanoidRootPart4)
 
         if not humanoidRootPart4 or not head2 then
           f50(v194)
         else
-          local rootPosition = humanoidRootPart4.Position
-          local magnitude10 = (rootPosition - localOrigin).Magnitude
-          local v196, v197 = currentCamera:WorldToViewportPoint(rootPosition)
+          local magnitude10 = (humanoidRootPart4.Position - f6()).Magnitude
+          local v196, v197 = currentCamera:WorldToViewportPoint(humanoidRootPart4.Position)
+
+          local worldToViewportPoint = currentCamera:WorldToViewportPoint(head2.Position
+            + Vector3.new(0, 0.5, 0))
+
+          local worldToViewportPoint2 = currentCamera:WorldToViewportPoint(humanoidRootPart4.Position
+            - Vector3.new(0, 3, 0))
 
           if v196.Z <= 0 then
             f50(v194)
           else
-            local worldToViewportPoint = currentCamera:WorldToViewportPoint(head2.Position
-              + Vector3.new(0, 0.5, 0))
-
-            local worldToViewportPoint2 = currentCamera:WorldToViewportPoint(rootPosition
-              - Vector3.new(0, 3, 0))
-
             local v198 = math.max(
               math.abs(worldToViewportPoint2.Y - worldToViewportPoint.Y), 12
             )
@@ -2331,73 +2273,82 @@ local function f51()
               or v200 and v163.accent
               or v163.enemy
 
-            local v201 = magnitude10 <= espDistance
+            local v201 = magnitude10 <= v3.espDistance
             local v202 = v197 == true
-            local v203 = espEnabled and v201 and v202
+            local esp2 = v3.esp
+
+            local v203 = esp2
+            v203 = esp2 and v201 and v202
+
+            local v204 = v3.espBox == true
+            local v205 = v3.espCorner == true
+            local v206 = v3.espChams == true
+            local v207 = v3.espSkeleton == true
             local v208 = v196.X - v199 * 0.5
             local y = worldToViewportPoint.Y
-            local boxPosition = Vector2.new(v208, y)
-            local boxSize = Vector2.new(v199, v198)
 
-            v194.outline.Position = boxPosition
-            v194.outline.Size = boxSize
-            v194.outline.Visible = v203 and espBoxEnabled
+            v194.outline.Position = Vector2.new(v208, y)
+            v194.outline.Size = Vector2.new(v199, v198)
 
-            v194.box.Position = boxPosition
-            v194.box.Size = boxSize
+            local outline = v194.outline
+            outline.Visible = v203 and v204
+
+            v194.box.Position = v194.outline.Position
+            v194.box.Size = v194.outline.Size
             v194.box.Color = lock
-            v194.outline.Color = v3.boxOutlineColor or Color3.new(0, 0, 0)
-            v194.box.Visible = v203 and espBoxEnabled
 
-            if espCornerEnabled then
-              if not v194.corners then
-                v194.corners = {}
+            local outline2 = v194.outline
+            outline2.Color = v3.boxOutlineColor or Color3.new(0, 0, 0)
 
-                for k = 1, 8 do
-                  v194.corners[k] = f41("Line", {
-                    Thickness = 2,
-                    Color = v163.enemy,
-                    ZIndex = 10,
-                    Visible = false,
-                  })
-                end
-              end
+            local box = v194.box
+            box.Visible = v203 and v204
 
-              local v209 = math.clamp(v199 * 0.25, 4, 14)
-              local v211 = v203
-              local x2 = v208 + v199
-              local y2 = y + v198
-              local corners = v194.corners
+            if not v194.corners then
+              v194.corners = {}
 
-              local function f52(p86, from, to)
-                local v210 = corners[p86]
-
-                if v210 then
-                  v210.From = from
-                  v210.To = to
-                  v210.Color = lock
-                  v210.Visible = v211
-                end
-              end
-
-              f52(1, Vector2.new(v208, y), Vector2.new(v208 + v209, y))
-              f52(2, Vector2.new(v208, y), Vector2.new(v208, y + v209))
-              f52(3, Vector2.new(x2, y), Vector2.new(x2 - v209, y))
-              f52(4, Vector2.new(x2, y), Vector2.new(x2, y + v209))
-              f52(5, Vector2.new(v208, y2), Vector2.new(v208 + v209, y2))
-              f52(6, Vector2.new(v208, y2), Vector2.new(v208, y2 - v209))
-              f52(7, Vector2.new(x2, y2), Vector2.new(x2 - v209, y2))
-              f52(8, Vector2.new(x2, y2), Vector2.new(x2, y2 - v209))
-            elseif v194.corners then
               for k = 1, 8 do
-                local corner = v194.corners[k]
-                if corner then
-                  corner.Visible = false
-                end
+                v194.corners[k] = f41("Line", {
+                  Thickness = 2,
+                  Color = v163.enemy,
+                  ZIndex = 10,
+                  Visible = false,
+                })
               end
             end
 
-            if espChamsEnabled and v203 and not v194.chamFill then
+            local v209 = math.clamp(v199 * 0.25, 4, 14)
+
+            local function f52(p86, from, to, visible3)
+              local v210 = v194.corners[p86]
+
+              if v210 then
+                v210.From = from
+                v210.To = to
+                v210.Color = lock
+                v210.Visible = visible3
+              end
+            end
+
+            local v211 = v203 and v205
+
+            f52(1, Vector2.new(v208, y), Vector2.new(v208 + v209, y), v211)
+            f52(2, Vector2.new(v208, y), Vector2.new(v208, y + v209), v211)
+            f52(3, Vector2.new(v208 + v199, y), Vector2.new(v208 + v199 - v209, y), v211)
+            f52(4, Vector2.new(v208 + v199, y), Vector2.new(v208 + v199, y + v209), v211)
+            f52(5, Vector2.new(v208, y + v198), Vector2.new(v208 + v209, y + v198), v211)
+            f52(6, Vector2.new(v208, y + v198), Vector2.new(v208, y + v198 - v209), v211)
+
+            f52(
+              7, Vector2.new(v208 + v199, y + v198), Vector2.new(v208 + v199 - v209, y + v198),
+              v211
+            )
+
+            f52(
+              8, Vector2.new(v208 + v199, y + v198), Vector2.new(v208 + v199, y + v198 - v209),
+              v211
+            )
+
+            if v206 and v203 and not v194.chamFill then
               v194.chamFill = f41("Square", {
                 Filled = true,
                 Color = v163.enemy,
@@ -2408,26 +2359,26 @@ local function f51()
             end
 
             if v194.chamFill then
-              if v203 and espChamsEnabled then
-                v194.chamFill.Position = boxPosition
-                v194.chamFill.Size = boxSize
-                v194.chamFill.Color = v3.chamsColor or lock
-                v194.chamFill.Visible = true
-              else
-                v194.chamFill.Visible = false
-              end
+              v194.chamFill.Position = v194.outline.Position
+              v194.chamFill.Size = v194.outline.Size
+
+              local chamFill = v194.chamFill
+              chamFill.Color = v3.chamsColor or lock
+
+              local chamFill2 = v194.chamFill
+              chamFill2.Visible = v203 and v206
             end
 
-            if v203 and (espSkeletonEnabled or espChamsEnabled) then
-              f47(v194, v195, lock, v198, espSkeletonEnabled, espChamsEnabled)
+            if v203 and (v207 or v206) then
+              f47(v194, v195, lock, v198, v207, v206)
             else
               f45(v194)
             end
 
             local v212 = true
 
-            if visibilityEnabled then
-              v212 = f13(head2, localOrigin)
+            if v3.visibility then
+              v212 = f13(head2, f6())
             end
 
             lock = v200 and v212 and (v3.espColorSelected or v163.accent) or v3.espColor
@@ -2436,76 +2387,81 @@ local function f51()
             v194.box.Color = lock
             v194.outline.Color = lock
 
-            if showNames or showDistance then
-              local v213 = {}
+            local v213 = {}
 
-              if showNames then
-                v213[#v213 + 1] = value33.Name
-              end
-
-              if showDistance then
-                v213[#v213 + 1] = string.format("[%dm]", math.floor(magnitude10 + 0.5))
-              end
-
-              v194.name.Position = Vector2.new(v196.X, worldToViewportPoint.Y - 18)
-              v194.name.Text = table.concat(v213, "  ")
-              v194.name.Color = v3.nameColor or v163.text
-              v194.name.Visible = v203 and #v213 > 0
-            else
-              v194.name.Visible = false
+            if v3.showNames then
+              v213[#v213 + 1] = value33.Name
             end
 
+            if v3.showDistance then
+              v213[#v213 + 1] = string.format("[%dm]", math.floor(magnitude10 + 0.5))
+            end
+
+            v194.name.Position = Vector2.new(v196.X, worldToViewportPoint.Y - 18)
+            v194.name.Text = table.concat(v213, "  ")
+
+            local name2 = v194.name
+            name2.Color = v3.nameColor or v163.text
+
+            local name3 = v194.name
+            name3.Visible = v203 and #v213 > 0
+
+            local showWeapon = v3.showWeapon and f44(v195) or nil
+
             if v194.weapon then
-              if showWeaponEnabled and v203 then
-                local showWeapon = f44(v195)
-                v194.weapon.Position = Vector2.new(v196.X, worldToViewportPoint.Y
-                  - (v194.name.Visible and 32 or 18))
-                v194.weapon.Text = showWeapon or ""
-                v194.weapon.Color = v3.weaponColor or v3.nameColor or v163.muted
-                v194.weapon.Visible = showWeapon ~= nil
-              else
-                v194.weapon.Visible = false
-              end
+              v194.weapon.Position = Vector2.new(v196.X, worldToViewportPoint.Y
+                - (v194.name.Visible and 32 or 18))
+
+              local weapon = v194.weapon
+              weapon.Text = showWeapon or ""
+
+              local weapon2 = v194.weapon
+              weapon2.Color = v3.weaponColor or v3.nameColor or v163.muted
+
+              local weapon3 = v194.weapon
+              weapon3.Visible = v203 and showWeapon ~= nil
+            end
+
+            local humanoid3 = v195:FindFirstChildOfClass("Humanoid")
+            local v214 = 1
+
+            if humanoid3 and humanoid3.MaxHealth > 0 then
+              v214 = math.clamp(humanoid3.Health / humanoid3.MaxHealth, 0, 1)
             end
 
             if v194.hpBack and v194.hpFill then
-              if showHealthBar and v203 then
-                local humanoid3 = v195:FindFirstChildOfClass("Humanoid")
-                local v214 = 1
+              local v215 = v208 - 6
 
-                if humanoid3 and humanoid3.MaxHealth > 0 then
-                  v214 = math.clamp(humanoid3.Health / humanoid3.MaxHealth, 0, 1)
-                end
+              v194.hpBack.Position = Vector2.new(v215, y)
+              v194.hpBack.Size = Vector2.new(3, v198)
 
-                local v215 = v208 - 6
-                local v216 = math.max(v198 * v214, 0)
+              local hpBack = v194.hpBack
+              hpBack.Visible = v203 and v3.showHealthBar
 
-                v194.hpBack.Position = Vector2.new(v215, y)
-                v194.hpBack.Size = Vector2.new(3, v198)
-                v194.hpBack.Visible = true
+              local v216 = math.max(v198 * v214, 0)
 
-                v194.hpFill.Position = Vector2.new(v215, y + (v198 - v216))
-                v194.hpFill.Size = Vector2.new(3, v216)
-                v194.hpFill.Color = (v3.healthLow or v163.off):Lerp(v3.healthHigh or v163.on, v214)
-                v194.hpFill.Visible = true
-              else
-                v194.hpBack.Visible = false
-                v194.hpFill.Visible = false
-              end
+              v194.hpFill.Position = Vector2.new(v215, y + (v198 - v216))
+              v194.hpFill.Size = Vector2.new(3, v216)
+
+              local hpFill = v194.hpFill
+              hpFill.Color = (v3.healthLow or v163.off):Lerp(v3.healthHigh or v163.on, v214)
+
+              local hpFill2 = v194.hpFill
+              hpFill2.Visible = v203 and v3.showHealthBar
             end
 
-            if tracersEnabled and v202 and magnitude10 <= tracerDistance then
-              local vector4 = Vector2.new(
-                math.clamp(v196.X, 0, viewportSize2.X), math.clamp(v196.Y, 0, viewportSize2.Y)
-              )
+            local vector4 = Vector2.new(
+              math.clamp(v196.X, 0, viewportSize2.X), math.clamp(v196.Y, 0, viewportSize2.Y)
+            )
 
-              v194.tracer.From = screenBottom
-              v194.tracer.To = vector4
-              v194.tracer.Color = v3.tracerColor or lock
-              v194.tracer.Visible = true
-            else
-              v194.tracer.Visible = false
-            end
+            v194.tracer.From = Vector2.new(viewportSize2.X * 0.5, viewportSize2.Y - 4)
+            v194.tracer.To = vector4
+
+            local tracer = v194.tracer
+            tracer.Color = v3.tracerColor or lock
+
+            local tracer2 = v194.tracer
+            tracer2.Visible = v3.tracers and magnitude10 <= v3.tracerDistance
           end
         end
       end
@@ -3156,7 +3112,9 @@ table.insert(v3.connections, playerRemoving:Connect(function(p88)
   local v228 = v3.playerDrawings[p88]
 
   if v228 then
-    f50(v228)
+    for key10, value85 in pairs(v228) do
+    end
+
     v3.playerDrawings[p88] = nil
   end
 end))
