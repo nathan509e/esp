@@ -1,4 +1,3 @@
-```
 local players = game:GetService("Players")
 local replicatedStorage = game:GetService("ReplicatedStorage")
 local runService = game:GetService("RunService")
@@ -2405,9 +2404,12 @@ local function f51()
             end
 
             if espChamsEnabled and v203 then
-              if not v194.glowHighlight or not v194.glowHighlight.Parent then
-                local glow = Instance.new("Highlight")
+              local glow = v194.glowHighlight
+
+              if not glow or not glow.Parent then
+                glow = Instance.new("Highlight")
                 glow.Name = "PlayerESPGlow"
+                glow.Adornee = v195
                 glow.FillTransparency = 0.65
                 glow.OutlineTransparency = 0
                 glow.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
@@ -2415,8 +2417,6 @@ local function f51()
                 glow.Parent = v195
                 v194.glowHighlight = glow
               end
-
-              local glow = v194.glowHighlight
 
               if glow.Adornee ~= v195 then
                 glow.Adornee = v195
@@ -2430,24 +2430,15 @@ local function f51()
               v194.glowHighlight.Enabled = false
             end
 
+            -- O renderer antigo de Chams fica desativado.
+            if v194.chamFill then
+              v194.chamFill.Visible = false
+            end
+
             if v203 and espSkeletonEnabled then
               f47(v194, v195, lock, v198, true, false)
             else
-              for i = 1, #v170 do
-                local bone = v194["bone" .. i]
-                if bone then
-                  bone.Visible = false
-                end
-
-                local cham = v194["cham" .. i]
-                if cham then
-                  cham.Visible = false
-                end
-              end
-
-              if v194.chamFill then
-                v194.chamFill.Visible = false
-              end
+              f45(v194)
             end
 
             local v212 = true
@@ -3234,4 +3225,3 @@ library:OnUnload(function()
 end)
 
 v3.lastResult = "ready"
-```
