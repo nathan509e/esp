@@ -1,817 +1,457 @@
-local players = game:GetService("Players")
-local runService = game:GetService("RunService")
-local workspaceService = game:GetService("Workspace")
+local v1 = game:GetService("Players")
+local v2 = game:GetService("RunService")
+local v3 = game:GetService("UserInputService")
+local v4 = game:GetService("Workspace")
 
-local localPlayer = players.LocalPlayer
-local currentCamera = workspaceService.CurrentCamera
+local v5 = v1.LocalPlayer
+local v6 = v5:WaitForChild("PlayerGui")
+local v7 = v4.CurrentCamera
 
-local v3 = {
-  active = true,
-  esp = true,
-  espBox = true,
-  espCorner = false,
-  espSkeleton = false,
-  espChams = false,
-  showNames = true,
-  showDistance = true,
-  showHealthBar = true,
-  showWeapon = true,
-  tracers = true,
-  visibility = true,
-  espDistance = 900,
-  tracerDistance = 650,
-
-  espColor = Color3.fromRGB(255, 84, 92),
-  nameColor = Color3.fromRGB(238, 243, 252),
-  skeletonColor = Color3.fromRGB(255, 255, 255),
-  healthHigh = Color3.fromRGB(65, 224, 139),
-  healthLow = Color3.fromRGB(236, 89, 98),
-  tracerColor = Color3.fromRGB(255, 84, 92),
-  chamsColor = Color3.fromRGB(255, 84, 92),
-  weaponColor = Color3.fromRGB(157, 171, 194),
-  boxOutlineColor = Color3.fromRGB(0, 0, 0),
-
-  connections = {},
-  drawings = {},
-  playerDrawings = {},
+local v8 = {
+  enabled = true,
+  names = true,
+  visibleHue = 0.33,
+  hiddenHue = 0,
+  fill = 0.35,
+  outline = 0,
+  distance = 1200,
+  interval = 0.06,
 }
 
-local function f1(p1)
-  local character = p1 and p1.Character
-  local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+local v9 = {}
+local v10 = {}
+local v11 = 0
 
-  if character and humanoid and humanoid.Health > 0 then
-    return character, humanoid
+local v12 = v6:FindFirstChild("ESPSettings")
+if v12 then
+  v12:Destroy()
+end
+
+local v13 = RaycastParams.new()
+v13.FilterType = Enum.RaycastFilterType.Exclude
+v13.IgnoreWater = true
+
+local function f1(p1)
+  if not p1 or p1 == v5 then
+    return true
   end
 
-  return nil, nil
+  return v5.Team ~= nil
+    and p1.Team ~= nil
+    and p1.Team == v5.Team
 end
 
 local function f2()
-  local character = localPlayer.Character
-  local root = character and character:FindFirstChild("HumanoidRootPart")
-  return root and root.Position or (currentCamera and currentCamera.CFrame.Position) or Vector3.zero
+  local p2 = {}
+
+  if v5.Character then
+    table.insert(p2, v5.Character)
+  end
+
+  v13.FilterDescendantsInstances = p2
 end
 
-local function f3(p2)
-  if not p2 or p2 == localPlayer then
-    return false
-  end
-
-  if localPlayer.Team ~= nil and p2.Team ~= nil and localPlayer.Team == p2.Team then
-    return false
-  end
-
-  return f1(p2) ~= nil
-end
-
-local function f4(p3, p4)
-  if not p3 then
-    return false
-  end
-
-  local params = RaycastParams.new()
-  params.FilterType = Enum.RaycastFilterType.Exclude
-
-  local ignore = {}
-  if localPlayer.Character then
-    table.insert(ignore, localPlayer.Character)
-  end
-
-  params.FilterDescendantsInstances = ignore
-  params.IgnoreWater = true
-
-  local origin = p4 or (currentCamera and currentCamera.CFrame.Position)
-  if not origin then
-    return false
-  end
-
-  local result = workspaceService:Raycast(origin, p3.Position - origin, params)
-  return result == nil or result.Instance:IsDescendantOf(p3.Parent)
-end
-
-local drawing = getgenv and getgenv().Drawing or rawget(_G, "Drawing") or nil
-if not drawing and type(Drawing) == "table" then
-  drawing = Drawing
-end
-
-local v4 = type(drawing) == "table" and type(drawing.new) == "function"
-
-local function f5(p5, p6)
-  if not v4 then
+local function f3(p3)
+  local p4 = p3 and p3.Character
+  if not p4 then
     return nil
   end
 
-  local ok, object = pcall(drawing.new, p5)
-  if not ok or not object then
-    v4 = false
+  local p5 = p4:FindFirstChildOfClass("Humanoid")
+  if not p5 or p5.Health <= 0 then
     return nil
   end
 
-  for key, value in pairs(p6 or {}) do
-    pcall(function()
-      object[key] = value
+  local p6 = p4:FindFirstChild("Head")
+  if not p6 then
+    return nil
+  end
+
+  return p4, p5, p6
+end
+
+local function f4(p7)
+  if not v7 then
+    return false
+  end
+
+  local p8, _, p9 = f3(p7)
+  if not p8 then
+    return false
+  end
+
+  local p10 = v7.CFrame.Position
+  local p11 = p9.Position - p10
+  local p12 = v4:Raycast(p10, p11, v13)
+
+  if not p12 then
+    return true
+  end
+
+  return p12.Instance:IsDescendantOf(p8)
+end
+
+local function f5(p13)
+  return Color3.fromHSV(p13, 1, 1)
+end
+
+local function f6(p14)
+  if p14 == v5 then
+    return
+  end
+
+  local function f7(p15)
+    if v9[p14] then
+      v9[p14]:Destroy()
+      v9[p14] = nil
+    end
+
+    if v10[p14] then
+      v10[p14]:Destroy()
+      v10[p14] = nil
+    end
+
+    local p16 = Instance.new("Highlight")
+    p16.Name = "PlayerESP"
+    p16.Adornee = p15
+    p16.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    p16.FillTransparency = 1 - v8.fill
+    p16.OutlineTransparency = v8.outline
+    p16.Enabled = false
+    p16.Parent = p15
+
+    v9[p14] = p16
+
+    task.spawn(function()
+      local p17 = p15:FindFirstChild("Head")
+
+      if not p17 then
+        p17 = p15:WaitForChild("Head", 5)
+      end
+
+      if not p17 or p14.Character ~= p15 then
+        return
+      end
+
+      if v10[p14] then
+        v10[p14]:Destroy()
+        v10[p14] = nil
+      end
+
+      local p18 = Instance.new("BillboardGui")
+      p18.Name = "PlayerNameESP"
+      p18.Adornee = p17
+      p18.Size = UDim2.fromOffset(220, 40)
+      p18.StudsOffset = Vector3.new(0, 2.2, 0)
+      p18.AlwaysOnTop = true
+      p18.MaxDistance = v8.distance
+      p18.Enabled = false
+      p18.Parent = v6
+
+      local p19 = Instance.new("TextLabel")
+      p19.Size = UDim2.fromScale(1, 1)
+      p19.BackgroundTransparency = 1
+      p19.Text = p14.Name
+      p19.TextColor3 = Color3.new(1, 1, 1)
+      p19.TextStrokeColor3 = Color3.new(0, 0, 0)
+      p19.TextStrokeTransparency = 0
+      p19.Font = Enum.Font.GothamBold
+      p19.TextSize = 14
+      p19.Parent = p18
+
+      v10[p14] = p18
     end)
   end
 
-  table.insert(v3.drawings, object)
-  return object
+  if p14.Character then
+    f7(p14.Character)
+  end
+
+  p14.CharacterAdded:Connect(f7)
 end
 
-local v5 = {
-  on = Color3.fromRGB(65, 224, 139),
-  off = Color3.fromRGB(236, 89, 98),
-  enemy = Color3.fromRGB(255, 84, 92),
-  text = Color3.fromRGB(238, 243, 252),
-  muted = Color3.fromRGB(157, 171, 194),
-}
-
-local v6 = {
-  { "head", "chest" }, { "chest", "pelvis" }, { "chest", "leftUpperArm" },
-  { "leftUpperArm", "leftLowerArm" }, { "leftLowerArm", "leftHand" },
-  { "chest", "rightUpperArm" }, { "rightUpperArm", "rightLowerArm" },
-  { "rightLowerArm", "rightHand" }, { "pelvis", "leftUpperLeg" },
-  { "leftUpperLeg", "leftLowerLeg" }, { "leftLowerLeg", "leftFoot" },
-  { "pelvis", "rightUpperLeg" }, { "rightUpperLeg", "rightLowerLeg" },
-  { "rightLowerLeg", "rightFoot" },
-}
-
-local function f6(p7, p8)
-  for _, name in ipairs(p8) do
-    local part = p7:FindFirstChild(name) or p7:FindFirstChild(name, true)
-    if part and part:IsA("BasePart") then
-      return part.Position
-    end
+local function f8(p20)
+  if v9[p20] then
+    v9[p20]:Destroy()
+    v9[p20] = nil
   end
 
-  return nil
+  if v10[p20] then
+    v10[p20]:Destroy()
+    v10[p20] = nil
+  end
 end
 
-local function f7(p9)
-  if not p9 then
-    return nil
-  end
+local function f9()
+  v7 = v4.CurrentCamera or v7
 
-  for _, child in ipairs(p9:GetChildren()) do
-    if child:IsA("Tool") then
-      return child.Name
-    end
-  end
-
-  return nil
-end
-
-local function f8(p10)
-  local head = f6(p10, { "Head" })
-  local chest = f6(p10, { "UpperTorso", "Torso" })
-  local pelvis = f6(p10, { "LowerTorso", "Torso", "HumanoidRootPart" })
-
-  if not chest then
-    chest = pelvis
-  end
-
-  if not pelvis then
-    pelvis = chest
-  end
-
-  local function limb(a, b, c, legacy)
-    local p1 = f6(p10, { a })
-    local p2 = f6(p10, { b })
-    local p3 = f6(p10, { c })
-    local old = f6(p10, { legacy })
-
-    if p1 and p2 and p3 then
-      return p1, p2, p3
-    end
-
-    if old and chest then
-      return chest, old, old
-    end
-
-    return p1, p2 or p1, p3 or p2 or p1
-  end
-
-  local lua, lla, lh = limb("LeftUpperArm", "LeftLowerArm", "LeftHand", "Left Arm")
-  local rua, rla, rh = limb("RightUpperArm", "RightLowerArm", "RightHand", "Right Arm")
-  local lul, lll, lf = limb("LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "Left Leg")
-  local rul, rll, rf = limb("RightUpperLeg", "RightLowerLeg", "RightFoot", "Right Leg")
-
-  return {
-    head = head,
-    chest = chest,
-    pelvis = pelvis,
-    leftUpperArm = lua,
-    leftLowerArm = lla,
-    leftHand = lh,
-    rightUpperArm = rua,
-    rightLowerArm = rla,
-    rightHand = rh,
-    leftUpperLeg = lul,
-    leftLowerLeg = lll,
-    leftFoot = lf,
-    rightUpperLeg = rul,
-    rightLowerLeg = rll,
-    rightFoot = rf,
-  }
-end
-
-local function f9(p11)
-  if not p11 then
+  if not v7 then
     return
   end
 
-  for i = 1, #v6 do
-    local bone = p11["bone" .. i]
-    if bone then bone.Visible = false end
+  local p21 = f5(v8.visibleHue)
+  local p22 = f5(v8.hiddenHue)
+  local p23 = v5.Character
+  local p24 = p23 and p23:FindFirstChild("HumanoidRootPart")
 
-    local cham = p11["cham" .. i]
-    if cham then cham.Visible = false end
-  end
-
-  if p11.chamFill then
-    p11.chamFill.Visible = false
-  end
-end
-
-local function f10(p12, p13, p14, p15, p16, p17)
-  local points = {}
-
-  for key, worldPos in pairs(f8(p13)) do
-    if worldPos then
-      local pos = currentCamera:WorldToViewportPoint(worldPos)
-      if pos.Z > 0 then
-        points[key] = Vector2.new(pos.X, pos.Y)
-      end
-    end
-  end
-
-  for i, pair in ipairs(v6) do
-    if p16 and not p12["bone" .. i] then
-      p12["bone" .. i] = f5("Line", {
-        Thickness = 1.5,
-        Color = v3.skeletonColor,
-        Transparency = 1,
-        ZIndex = 11,
-        Visible = false,
-      })
+  for p25, p26 in pairs(v9) do
+    if not p26.Parent then
+      continue
     end
 
-    if p17 and not p12["cham" .. i] then
-      p12["cham" .. i] = f5("Line", {
-        Thickness = 8,
-        Color = v3.chamsColor,
-        Transparency = 0.48,
-        ZIndex = 9,
-        Visible = false,
-      })
+    local p27 = f1(p25)
+    local p28, _, p29 = f3(p25)
+
+    if p27 or not p28 then
+      p26.Enabled = false
+
+      local p30 = v10[p25]
+      if p30 then
+        p30.Enabled = false
+      end
+
+      continue
     end
 
-    local a = points[pair[1]]
-    local b = points[pair[2]]
-    local bone = p12["bone" .. i]
-    local cham = p12["cham" .. i]
-    local valid = a and b and (a - b).Magnitude > 0.08
+    local p31 = p28:FindFirstChild("HumanoidRootPart") or p29
+    local p32 = math.huge
 
-    if valid then
-      if bone then
-        bone.From = a
-        bone.To = b
-        bone.Color = v3.skeletonColor or p14
-        bone.Visible = p16
-      end
+    if p24 and p31 then
+      p32 = (p31.Position - p24.Position).Magnitude
+    elseif p31 then
+      p32 = (p31.Position - v7.CFrame.Position).Magnitude
+    end
 
-      if cham then
-        cham.From = a
-        cham.To = b
-        cham.Color = v3.chamsColor or p14
-        cham.Thickness = math.clamp(p15 / 17, 5, 16)
-        cham.Visible = p17
-      end
-    else
-      if bone then bone.Visible = false end
-      if cham then cham.Visible = false end
+    local p33 = v8.enabled and p32 <= v8.distance
+
+    p26.Enabled = p33
+    p26.FillTransparency = 1 - v8.fill
+    p26.OutlineTransparency = v8.outline
+
+    if p33 then
+      local p34 = f4(p25)
+      local p35 = p34 and p21 or p22
+      p26.FillColor = p35
+      p26.OutlineColor = p35
+    end
+
+    local p36 = v10[p25]
+
+    if p36 then
+      p36.Enabled = p33 and v8.names
+      p36.MaxDistance = v8.distance
     end
   end
 end
 
-local function f11(p18)
-  local existing = v3.playerDrawings[p18]
-  if existing then
-    return existing
+f2()
+
+v5.CharacterAdded:Connect(function()
+  task.defer(f2)
+end)
+
+local v14 = Instance.new("ScreenGui")
+v14.Name = "ESPSettings"
+v14.ResetOnSpawn = false
+v14.IgnoreGuiInset = true
+v14.Parent = v6
+
+local v15 = Instance.new("Frame")
+v15.Size = UDim2.fromOffset(360, 350)
+v15.Position = UDim2.new(0.5, -180, 0.5, -175)
+v15.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
+v15.BorderSizePixel = 0
+v15.Visible = false
+v15.Parent = v14
+
+local v16 = Instance.new("UICorner")
+v16.CornerRadius = UDim.new(0, 10)
+v16.Parent = v15
+
+local v17 = Instance.new("TextLabel")
+v17.Size = UDim2.new(1, -20, 0, 35)
+v17.Position = UDim2.fromOffset(10, 5)
+v17.BackgroundTransparency = 1
+v17.Text = "ESP"
+v17.TextColor3 = Color3.new(1, 1, 1)
+v17.TextSize = 18
+v17.Font = Enum.Font.GothamBold
+v17.TextXAlignment = Enum.TextXAlignment.Left
+v17.Parent = v15
+
+local function f10(p38, p39, p40, p41)
+  local p42 = Instance.new("TextButton")
+  p42.Size = UDim2.fromOffset(145, 32)
+  p42.Position = UDim2.fromOffset(p39, 50)
+  p42.BorderSizePixel = 0
+  p42.Font = Enum.Font.GothamBold
+  p42.TextSize = 14
+  p42.TextColor3 = Color3.new(1, 1, 1)
+  p42.Parent = v15
+
+  local p43 = Instance.new("UICorner")
+  p43.CornerRadius = UDim.new(0, 6)
+  p43.Parent = p42
+
+  local p44 = p40
+
+  local function f11()
+    p42.Text = p38 .. (p44 and ": ON" or ": OFF")
+    p42.BackgroundColor3 = p44
+      and Color3.fromRGB(40, 150, 80)
+      or Color3.fromRGB(150, 50, 50)
   end
 
-  local objects = {
-    box = f5("Square", {
-      Filled = false,
-      Thickness = 1.5,
-      Color = v5.enemy,
-      ZIndex = 10,
-      Visible = false,
-    }),
-    outline = f5("Square", {
-      Filled = false,
-      Thickness = 3.5,
-      Color = Color3.new(0, 0, 0),
-      ZIndex = 9,
-      Visible = false,
-    }),
-    name = f5("Text", {
-      Center = true,
-      Size = 13,
-      Font = 2,
-      Color = v5.text,
-      Outline = true,
-      ZIndex = 11,
-      Visible = false,
-    }),
-    weapon = f5("Text", {
-      Center = true,
-      Size = 12,
-      Font = 2,
-      Color = v5.muted,
-      Outline = true,
-      ZIndex = 11,
-      Visible = false,
-    }),
-    tracer = f5("Line", {
-      Thickness = 1.5,
-      Color = v5.enemy,
-      ZIndex = 10,
-      Visible = false,
-    }),
-    hpBack = f5("Square", {
-      Filled = true,
-      Color = Color3.fromRGB(0, 0, 0),
-      Transparency = 0.35,
-      ZIndex = 10,
-      Visible = false,
-    }),
-    hpFill = f5("Square", {
-      Filled = true,
-      Color = v5.on,
-      Transparency = 0.15,
-      ZIndex = 11,
-      Visible = false,
-    }),
-  }
+  p42.MouseButton1Click:Connect(function()
+    p44 = not p44
+    p41(p44)
+    f11()
+  end)
 
-  v3.playerDrawings[p18] = objects
-  return objects
+  f11()
 end
 
-local function f12(p19)
-  if not p19 then
-    return
-  end
+f10("ESP", 20, v8.enabled, function(p45)
+  v8.enabled = p45
+end)
 
-  for _, key in ipairs({ "box", "outline", "name", "weapon", "tracer", "hpBack", "hpFill", "chamFill" }) do
-    local object = p19[key]
-    if object then
-      object.Visible = false
-    end
-  end
+f10("NAMES", 195, v8.names, function(p46)
+  v8.names = p46
+end)
 
-  if p19.corners then
-    for _, corner in ipairs(p19.corners) do
-      if corner then
-        corner.Visible = false
-      end
-    end
-  end
-
-  f9(p19)
+local function f12(p47, p48)
+  local p49 = Instance.new("TextLabel")
+  p49.Size = UDim2.new(1, -40, 0, 22)
+  p49.Position = UDim2.fromOffset(20, p48)
+  p49.BackgroundTransparency = 1
+  p49.Text = p47
+  p49.TextColor3 = Color3.fromRGB(220, 220, 220)
+  p49.Font = Enum.Font.Gotham
+  p49.TextSize = 13
+  p49.TextXAlignment = Enum.TextXAlignment.Left
+  p49.Parent = v15
+  return p49
 end
 
-local function f13()
-  currentCamera = workspaceService.CurrentCamera or currentCamera
-  if not currentCamera then
-    return
+local function f13(p50, p51, p52)
+  local p53 = Instance.new("Frame")
+  p53.Size = UDim2.new(1, -40, 0, 18)
+  p53.Position = UDim2.fromOffset(20, p50)
+  p53.BorderSizePixel = 0
+  p53.Parent = v15
+
+  local p54 = Instance.new("UIGradient")
+  p54.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromHSV(0, 1, 1)),
+    ColorSequenceKeypoint.new(0.166, Color3.fromHSV(0.166, 1, 1)),
+    ColorSequenceKeypoint.new(0.333, Color3.fromHSV(0.333, 1, 1)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromHSV(0.5, 1, 1)),
+    ColorSequenceKeypoint.new(0.666, Color3.fromHSV(0.666, 1, 1)),
+    ColorSequenceKeypoint.new(0.833, Color3.fromHSV(0.833, 1, 1)),
+    ColorSequenceKeypoint.new(1, Color3.fromHSV(1, 1, 1)),
+  })
+  p54.Parent = p53
+
+  local p55 = Instance.new("Frame")
+  p55.Size = UDim2.fromOffset(3, 26)
+  p55.AnchorPoint = Vector2.new(0.5, 0.5)
+  p55.Position = UDim2.new(p51, 0, 0.5, 0)
+  p55.BackgroundColor3 = Color3.new(1, 1, 1)
+  p55.BorderSizePixel = 0
+  p55.Parent = p53
+
+  local p56 = false
+
+  local function f14(p57)
+    local p58 = p57.Position.X - p53.AbsolutePosition.X
+    local p59 = math.clamp(p58 / p53.AbsoluteSize.X, 0, 1)
+    p55.Position = UDim2.new(p59, 0, 0.5, 0)
+    p52(p59)
   end
 
-  local viewport = currentCamera.ViewportSize
-  local screenCenter = Vector2.new(viewport.X * 0.5, viewport.Y * 0.5)
-  local screenBottom = Vector2.new(screenCenter.X, viewport.Y - 4)
-  local origin = f2()
-
-  for _, player in ipairs(players:GetPlayers()) do
-    local draw = v3.playerDrawings[player]
-
-    if not (v3.esp or v3.tracers) or not f3(player) then
-      if draw then
-        f12(draw)
-      end
-    else
-      draw = draw or f11(player)
-
-      local character = f1(player)
-      local root = character and (
-        character:FindFirstChild("HumanoidRootPart")
-        or character.PrimaryPart
-        or character:FindFirstChildWhichIsA("BasePart")
-      )
-      local head = character and (character:FindFirstChild("Head") or root)
-
-      if not root or not head then
-        f12(draw)
-      else
-        local rootPos = root.Position
-        local distance = (rootPos - origin).Magnitude
-        local rootScreen, onScreen = currentCamera:WorldToViewportPoint(rootPos)
-
-        if rootScreen.Z <= 0 then
-          f12(draw)
-        else
-          local top = currentCamera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-          local bottom = currentCamera:WorldToViewportPoint(rootPos - Vector3.new(0, 3, 0))
-
-          local height = math.max(math.abs(bottom.Y - top.Y), 12)
-          local width = height * 0.55
-          local left = rootScreen.X - width * 0.5
-          local y = top.Y
-          local boxPosition = Vector2.new(left, y)
-          local boxSize = Vector2.new(width, height)
-
-          local inRange = distance <= v3.espDistance
-          local visibleOnScreen = onScreen == true
-          local showMain = v3.esp and inRange and visibleOnScreen
-          local color = v3.espColor or v5.enemy
-
-          draw.outline.Position = boxPosition
-          draw.outline.Size = boxSize
-          draw.outline.Color = v3.boxOutlineColor or Color3.new(0, 0, 0)
-          draw.outline.Visible = showMain and v3.espBox
-
-          draw.box.Position = boxPosition
-          draw.box.Size = boxSize
-          draw.box.Color = color
-          draw.box.Visible = showMain and v3.espBox
-
-          if v3.espCorner then
-            if not draw.corners then
-              draw.corners = {}
-              for i = 1, 8 do
-                draw.corners[i] = f5("Line", {
-                  Thickness = 2,
-                  Color = color,
-                  ZIndex = 10,
-                  Visible = false,
-                })
-              end
-            end
-
-            local segment = math.clamp(width * 0.25, 4, 14)
-            local right = left + width
-            local bottomY = y + height
-            local corners = draw.corners
-
-            local function c(i, a, b)
-              local line = corners[i]
-              if line then
-                line.From = a
-                line.To = b
-                line.Color = color
-                line.Visible = showMain
-              end
-            end
-
-            c(1, Vector2.new(left, y), Vector2.new(left + segment, y))
-            c(2, Vector2.new(left, y), Vector2.new(left, y + segment))
-            c(3, Vector2.new(right, y), Vector2.new(right - segment, y))
-            c(4, Vector2.new(right, y), Vector2.new(right, y + segment))
-            c(5, Vector2.new(left, bottomY), Vector2.new(left + segment, bottomY))
-            c(6, Vector2.new(left, bottomY), Vector2.new(left, bottomY - segment))
-            c(7, Vector2.new(right, bottomY), Vector2.new(right - segment, bottomY))
-            c(8, Vector2.new(right, bottomY), Vector2.new(right, bottomY - segment))
-          elseif draw.corners then
-            for _, corner in ipairs(draw.corners) do
-              if corner then corner.Visible = false end
-            end
-          end
-
-          if v3.espChams and showMain and not draw.chamFill then
-            draw.chamFill = f5("Square", {
-              Filled = true,
-              Color = v3.chamsColor or color,
-              Transparency = 0.2,
-              ZIndex = 8,
-              Visible = false,
-            })
-          end
-
-          if draw.chamFill then
-            if showMain and v3.espChams then
-              draw.chamFill.Position = boxPosition
-              draw.chamFill.Size = boxSize
-              draw.chamFill.Color = v3.chamsColor or color
-              draw.chamFill.Visible = true
-            else
-              draw.chamFill.Visible = false
-            end
-          end
-
-          if showMain and (v3.espSkeleton or v3.espChams) then
-            f10(draw, character, color, height, v3.espSkeleton, v3.espChams)
-          else
-            f9(draw)
-          end
-
-          local visible = true
-          if v3.visibility then
-            visible = f4(head, origin)
-          end
-
-          color = visible and (v3.espColor or v5.enemy) or (v3.espColor or v5.enemy)
-          draw.box.Color = color
-
-          if v3.showNames or v3.showDistance then
-            local parts = {}
-
-            if v3.showNames then
-              parts[#parts + 1] = player.Name
-            end
-
-            if v3.showDistance then
-              parts[#parts + 1] = string.format("[%dm]", math.floor(distance + 0.5))
-            end
-
-            draw.name.Position = Vector2.new(rootScreen.X, top.Y - 18)
-            draw.name.Text = table.concat(parts, "  ")
-            draw.name.Color = v3.nameColor or v5.text
-            draw.name.Visible = showMain and #parts > 0
-          else
-            draw.name.Visible = false
-          end
-
-          if v3.showWeapon and showMain then
-            local weapon = f7(character)
-            draw.weapon.Position = Vector2.new(rootScreen.X, top.Y - (draw.name.Visible and 32 or 18))
-            draw.weapon.Text = weapon or ""
-            draw.weapon.Color = v3.weaponColor or v5.muted
-            draw.weapon.Visible = weapon ~= nil
-          else
-            draw.weapon.Visible = false
-          end
-
-          if v3.showHealthBar and showMain then
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            local ratio = 1
-
-            if humanoid and humanoid.MaxHealth > 0 then
-              ratio = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-            end
-
-            local x = left - 6
-            local fillHeight = math.max(height * ratio, 0)
-
-            draw.hpBack.Position = Vector2.new(x, y)
-            draw.hpBack.Size = Vector2.new(3, height)
-            draw.hpBack.Visible = true
-
-            draw.hpFill.Position = Vector2.new(x, y + (height - fillHeight))
-            draw.hpFill.Size = Vector2.new(3, fillHeight)
-            draw.hpFill.Color = (v3.healthLow or v5.off):Lerp(v3.healthHigh or v5.on, ratio)
-            draw.hpFill.Visible = true
-          else
-            draw.hpBack.Visible = false
-            draw.hpFill.Visible = false
-          end
-
-          if v3.tracers and visibleOnScreen and distance <= v3.tracerDistance then
-            draw.tracer.From = screenBottom
-            draw.tracer.To = Vector2.new(
-              math.clamp(rootScreen.X, 0, viewport.X),
-              math.clamp(rootScreen.Y, 0, viewport.Y)
-            )
-            draw.tracer.Color = v3.tracerColor or color
-            draw.tracer.Visible = true
-          else
-            draw.tracer.Visible = false
-          end
-        end
-      end
+  p53.InputBegan:Connect(function(p60)
+    if p60.UserInputType == Enum.UserInputType.MouseButton1 then
+      p56 = true
+      f14(p60)
     end
-  end
+  end)
+
+  v3.InputChanged:Connect(function(p61)
+    if p56 and p61.UserInputType == Enum.UserInputType.MouseMovement then
+      f14(p61)
+    end
+  end)
+
+  v3.InputEnded:Connect(function(p62)
+    if p62.UserInputType == Enum.UserInputType.MouseButton1 then
+      p56 = false
+    end
+  end)
 end
 
-local library = loadstring(game:HttpGet(
-  "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"
-))()
+f12("Cor - jogador visível", 105)
+f13(132, v8.visibleHue, function(p63)
+  v8.visibleHue = p63
+end)
 
-local themeManager = loadstring(game:HttpGet(
-  "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/addons/ThemeManager.lua"
-))()
+f12("Cor - atrás da parede", 170)
+f13(197, v8.hiddenHue, function(p64)
+  v8.hiddenHue = p64
+end)
 
-local saveManager = loadstring(game:HttpGet(
-  "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/addons/SaveManager.lua"
-))()
+f12("INSERT = menu", 285)
 
-local window = library:CreateWindow({
-  Title = "ESP",
-  Footer = "ESP only",
-  Center = true,
-  AutoShow = true,
-})
-
-local tabs = {
-  Visuals = window:AddTab("Visuals", "eye"),
-  Settings = window:AddTab("Settings", "settings"),
-}
-
-local esp = tabs.Visuals:AddLeftGroupbox("ESP")
-
-esp:AddToggle("EspEnabled", {
-  Text = "ESP",
-  Default = v3.esp,
-  Callback = function(value) v3.esp = value end,
-})
-
-esp:AddToggle("EspTracers", {
-  Text = "Tracers",
-  Default = v3.tracers,
-  Callback = function(value) v3.tracers = value end,
-})
-
-esp:AddToggle("EspBox", {
-  Text = "Style: Box",
-  Default = v3.espBox,
-  Callback = function(value) v3.espBox = value end,
-})
-
-esp:AddToggle("EspCorner", {
-  Text = "Style: Corner",
-  Default = v3.espCorner,
-  Callback = function(value) v3.espCorner = value end,
-})
-
-esp:AddToggle("EspSkeleton", {
-  Text = "Style: Skeleton",
-  Default = v3.espSkeleton,
-  Callback = function(value) v3.espSkeleton = value end,
-})
-
-esp:AddToggle("EspChams", {
-  Text = "Style: Chams",
-  Default = v3.espChams,
-  Callback = function(value) v3.espChams = value end,
-})
-
-esp:AddToggle("EspShowNames", {
-  Text = "Names",
-  Default = v3.showNames,
-  Callback = function(value) v3.showNames = value end,
-})
-
-esp:AddToggle("EspShowDistance", {
-  Text = "Distance",
-  Default = v3.showDistance,
-  Callback = function(value) v3.showDistance = value end,
-})
-
-esp:AddToggle("EspShowHealthBar", {
-  Text = "Health Bar",
-  Default = v3.showHealthBar,
-  Callback = function(value) v3.showHealthBar = value end,
-})
-
-esp:AddToggle("EspShowWeapon", {
-  Text = "Weapon ESP",
-  Default = v3.showWeapon,
-  Callback = function(value) v3.showWeapon = value end,
-})
-
-esp:AddLabel("Enemy Color"):AddColorPicker("EspColor", {
-  Default = v3.espColor,
-  Title = "Enemy Color",
-  Callback = function(value) v3.espColor = value end,
-})
-
-esp:AddLabel("Name Color"):AddColorPicker("NameColor", {
-  Default = v3.nameColor,
-  Title = "Name Color",
-  Callback = function(value) v3.nameColor = value end,
-})
-
-esp:AddLabel("Weapon Color"):AddColorPicker("WeaponColor", {
-  Default = v3.weaponColor,
-  Title = "Weapon Color",
-  Callback = function(value) v3.weaponColor = value end,
-})
-
-esp:AddLabel("Skeleton Color"):AddColorPicker("SkeletonColor", {
-  Default = v3.skeletonColor,
-  Title = "Skeleton Color",
-  Callback = function(value) v3.skeletonColor = value end,
-})
-
-esp:AddLabel("Chams Color"):AddColorPicker("ChamsColor", {
-  Default = v3.chamsColor,
-  Title = "Chams Color",
-  Callback = function(value) v3.chamsColor = value end,
-})
-
-esp:AddLabel("Tracer Color"):AddColorPicker("TracerColor", {
-  Default = v3.tracerColor,
-  Title = "Tracer Color",
-  Callback = function(value) v3.tracerColor = value end,
-})
-
-esp:AddLabel("Box Outline"):AddColorPicker("BoxOutlineColor", {
-  Default = v3.boxOutlineColor,
-  Title = "Box Outline",
-  Callback = function(value) v3.boxOutlineColor = value end,
-})
-
-esp:AddLabel("HP High"):AddColorPicker("HealthHigh", {
-  Default = v3.healthHigh,
-  Title = "HP High",
-  Callback = function(value) v3.healthHigh = value end,
-})
-
-esp:AddLabel("HP Low"):AddColorPicker("HealthLow", {
-  Default = v3.healthLow,
-  Title = "HP Low",
-  Callback = function(value) v3.healthLow = value end,
-})
-
-esp:AddSlider("EspDistance", {
-  Text = "ESP Distance",
-  Default = v3.espDistance,
-  Min = 100,
-  Max = 2000,
-  Rounding = 0,
-  Callback = function(value) v3.espDistance = value end,
-})
-
-esp:AddSlider("EspTracerDistance", {
-  Text = "Tracer Distance",
-  Default = v3.tracerDistance,
-  Min = 100,
-  Max = 1500,
-  Rounding = 0,
-  Callback = function(value) v3.tracerDistance = value end,
-})
-
-local menu = tabs.Settings:AddLeftGroupbox("Menu")
-menu:AddLabel("Menu keybind"):AddKeyPicker("MenuKeybind", {
-  Default = "Delete",
-  NoUI = true,
-  Text = "Menu keybind",
-  Mode = "Toggle",
-})
-
-library.ToggleKeybind = library.Options.MenuKeybind
-
-local renderConnection = runService.RenderStepped:Connect(function()
-  if v3.active then
-    f13()
+v3.InputBegan:Connect(function(p65)
+  if p65.KeyCode == Enum.KeyCode.Insert then
+    v15.Visible = not v15.Visible
   end
 end)
 
-table.insert(v3.connections, renderConnection)
+local v18 = false
+local v19
+local v20
 
-local removeConnection = players.PlayerRemoving:Connect(function(player)
-  local draw = v3.playerDrawings[player]
-  if draw then
-    f12(draw)
-    v3.playerDrawings[player] = nil
+v17.InputBegan:Connect(function(p66)
+  if p66.UserInputType == Enum.UserInputType.MouseButton1 then
+    v18 = true
+    v19 = p66.Position
+    v20 = v15.Position
   end
 end)
 
-table.insert(v3.connections, removeConnection)
+v3.InputChanged:Connect(function(p67)
+  if v18 and p67.UserInputType == Enum.UserInputType.MouseMovement then
+    local p68 = p67.Position - v19
 
-function v3:Unload()
-  if not self.active then
-    return
+    v15.Position = UDim2.new(
+      v20.X.Scale,
+      v20.X.Offset + p68.X,
+      v20.Y.Scale,
+      v20.Y.Offset + p68.Y
+    )
   end
+end)
 
-  self.active = false
-
-  for _, connection in ipairs(self.connections) do
-    pcall(function()
-      connection:Disconnect()
-    end)
+v3.InputEnded:Connect(function(p69)
+  if p69.UserInputType == Enum.UserInputType.MouseButton1 then
+    v18 = false
   end
+end)
 
-  for _, object in ipairs(self.drawings) do
-    pcall(function()
-      object:Remove()
-    end)
+v1.PlayerAdded:Connect(f6)
+v1.PlayerRemoving:Connect(f8)
+
+task.spawn(function()
+  for _, p37 in ipairs(v1:GetPlayers()) do
+    task.spawn(f6, p37)
   end
+end)
 
-  self.drawings = {}
-  self.playerDrawings = {}
-end
+v2.RenderStepped:Connect(function(p70)
+  v11 += p70
 
-themeManager:SetLibrary(library)
-saveManager:SetLibrary(library)
-saveManager:IgnoreThemeSettings()
-saveManager:SetIgnoreIndexes({ "MenuKeybind" })
-
-themeManager:SetFolder("ESPOnly")
-saveManager:SetFolder("ESPOnly")
-saveManager:BuildConfigSection(tabs.Settings)
-themeManager:ApplyToTab(tabs.Settings)
-
-library:OnUnload(function()
-  v3:Unload()
+  if v11 >= v8.interval then
+    v11 = 0
+    f9()
+  end
 end)
