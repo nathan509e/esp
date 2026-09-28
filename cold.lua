@@ -1,3 +1,4 @@
+```
 local players = game:GetService("Players")
 local replicatedStorage = game:GetService("ReplicatedStorage")
 local runService = game:GetService("RunService")
@@ -2167,12 +2168,6 @@ local function f50(p85)
     end
   end
 
-  if p85.glowHighlight then
-    pcall(function()
-      p85.glowHighlight.Enabled = false
-    end)
-  end
-
   if f45 then
     f45(p85)
   end
@@ -2403,40 +2398,29 @@ local function f51()
               end
             end
 
-            if espChamsEnabled and v203 then
-              local glow = v194.glowHighlight
-
-              if not glow or not glow.Parent then
-                glow = Instance.new("Highlight")
-                glow.Name = "PlayerESPGlow"
-                glow.Adornee = v195
-                glow.FillTransparency = 0.65
-                glow.OutlineTransparency = 0
-                glow.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                glow.Enabled = false
-                glow.Parent = v195
-                v194.glowHighlight = glow
-              end
-
-              if glow.Adornee ~= v195 then
-                glow.Adornee = v195
-              end
-
-              local glowColor = v3.chamsColor or lock
-              glow.FillColor = glowColor
-              glow.OutlineColor = glowColor
-              glow.Enabled = true
-            elseif v194.glowHighlight then
-              v194.glowHighlight.Enabled = false
+            if espChamsEnabled and v203 and not v194.chamFill then
+              v194.chamFill = f41("Square", {
+                Filled = true,
+                Color = v163.enemy,
+                Transparency = 0.2,
+                ZIndex = 8,
+                Visible = false,
+              })
             end
 
-            -- O renderer antigo de Chams fica desativado.
             if v194.chamFill then
-              v194.chamFill.Visible = false
+              if v203 and espChamsEnabled then
+                v194.chamFill.Position = boxPosition
+                v194.chamFill.Size = boxSize
+                v194.chamFill.Color = v3.chamsColor or lock
+                v194.chamFill.Visible = true
+              else
+                v194.chamFill.Visible = false
+              end
             end
 
-            if v203 and espSkeletonEnabled then
-              f47(v194, v195, lock, v198, true, false)
+            if v203 and (espSkeletonEnabled or espChamsEnabled) then
+              f47(v194, v195, lock, v198, espSkeletonEnabled, espChamsEnabled)
             else
               f45(v194)
             end
@@ -3225,3 +3209,4 @@ library:OnUnload(function()
 end)
 
 v3.lastResult = "ready"
+```
