@@ -1,3 +1,4 @@
+```
 local players = game:GetService("Players")
 local replicatedStorage = game:GetService("ReplicatedStorage")
 local runService = game:GetService("RunService")
@@ -1944,11 +1945,7 @@ local function f45(p72)
   end
 
   if p72.chamFill then
-    if p72.chamFill:IsA("Highlight") then
-      p72.chamFill.Enabled = false
-    else
-      p72.chamFill.Visible = false
-    end
+    p72.chamFill.Visible = false
   end
 end
 
@@ -2158,11 +2155,7 @@ local function f50(p85)
   for i = 1, #direct do
     local obj = p85[direct[i]]
     if obj then
-      if direct[i] == "chamFill" and obj:IsA("Highlight") then
-        obj.Enabled = false
-      else
-        obj.Visible = false
-      end
+      obj.Visible = false
     end
   end
 
@@ -2173,6 +2166,12 @@ local function f50(p85)
         corner.Visible = false
       end
     end
+  end
+
+  if p85.glowHighlight then
+    pcall(function()
+      p85.glowHighlight.Enabled = false
+    end)
   end
 
   if f45 then
@@ -2405,42 +2404,50 @@ local function f51()
               end
             end
 
-            if espChamsEnabled and v203 and not v194.chamFill then
-              local highlight = Instance.new("Highlight")
-              highlight.Name = "PlayerESPGlow"
-              highlight.Adornee = v195
-              highlight.FillTransparency = 0.65
-              highlight.OutlineTransparency = 0
-              highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-              highlight.Enabled = false
-              highlight.Parent = v195
-              v194.chamFill = highlight
-            end
-
-            if v194.chamFill then
-              if v194.chamFill:IsA("Highlight") then
-                if v194.chamFill.Adornee ~= v195 then
-                  v194.chamFill.Adornee = v195
-                  v194.chamFill.Parent = v195
-                end
-
-                if v203 and espChamsEnabled then
-                  local glowColor = v3.chamsColor or lock
-                  v194.chamFill.FillColor = glowColor
-                  v194.chamFill.OutlineColor = glowColor
-                  v194.chamFill.FillTransparency = 0.65
-                  v194.chamFill.OutlineTransparency = 0
-                  v194.chamFill.Enabled = true
-                else
-                  v194.chamFill.Enabled = false
-                end
+            if espChamsEnabled and v203 then
+              if not v194.glowHighlight or not v194.glowHighlight.Parent then
+                local glow = Instance.new("Highlight")
+                glow.Name = "PlayerESPGlow"
+                glow.FillTransparency = 0.65
+                glow.OutlineTransparency = 0
+                glow.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                glow.Enabled = false
+                glow.Parent = v195
+                v194.glowHighlight = glow
               end
+
+              local glow = v194.glowHighlight
+
+              if glow.Adornee ~= v195 then
+                glow.Adornee = v195
+              end
+
+              local glowColor = v3.chamsColor or lock
+              glow.FillColor = glowColor
+              glow.OutlineColor = glowColor
+              glow.Enabled = true
+            elseif v194.glowHighlight then
+              v194.glowHighlight.Enabled = false
             end
 
             if v203 and espSkeletonEnabled then
               f47(v194, v195, lock, v198, true, false)
             else
-              f45(v194)
+              for i = 1, #v170 do
+                local bone = v194["bone" .. i]
+                if bone then
+                  bone.Visible = false
+                end
+
+                local cham = v194["cham" .. i]
+                if cham then
+                  cham.Visible = false
+                end
+              end
+
+              if v194.chamFill then
+                v194.chamFill.Visible = false
+              end
             end
 
             local v212 = true
@@ -3227,3 +3234,4 @@ library:OnUnload(function()
 end)
 
 v3.lastResult = "ready"
+```
