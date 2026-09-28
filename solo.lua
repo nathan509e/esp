@@ -12,6 +12,7 @@ local v8 = {
   names = true,
   visibleHue = 0.33,
   hiddenHue = 0,
+  allyHue = 0.58,
   fill = 0.35,
   outline = 0,
   distance = 1200,
@@ -202,7 +203,7 @@ local function f9()
     local p27 = f1(p25)
     local p28, _, p29 = f3(p25)
 
-    if p27 or not p28 then
+    if not p28 then
       p26.Enabled = false
 
       local p30 = v10[p25]
@@ -230,7 +231,14 @@ local function f9()
 
     if p33 then
       local p34 = f4(p25)
-      local p35 = p34 and p21 or p22
+      local p35
+
+      if p27 then
+        p35 = f5(v8.allyHue)
+      else
+        p35 = p34 and p21 or p22
+      end
+
       p26.FillColor = p35
       p26.OutlineColor = p35
     end
@@ -257,8 +265,8 @@ v14.IgnoreGuiInset = true
 v14.Parent = v6
 
 local v15 = Instance.new("Frame")
-v15.Size = UDim2.fromOffset(360, 350)
-v15.Position = UDim2.new(0.5, -180, 0.5, -175)
+v15.Size = UDim2.fromOffset(360, 385)
+v15.Position = UDim2.new(0.5, -180, 0.5, -192)
 v15.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
 v15.BorderSizePixel = 0
 v15.Visible = false
@@ -399,10 +407,15 @@ f13(197, v8.hiddenHue, function(p64)
   v8.hiddenHue = p64
 end)
 
-f12("INSERT = menu", 285)
+f12("Cor - aliados", 235)
+f13(262, v8.allyHue, function(p65)
+  v8.allyHue = p65
+end)
 
-v3.InputBegan:Connect(function(p65)
-  if p65.KeyCode == Enum.KeyCode.Insert then
+f12("INSERT = menu", 315)
+
+v3.InputBegan:Connect(function(p66)
+  if p66.KeyCode == Enum.KeyCode.Insert then
     v15.Visible = not v15.Visible
   end
 end)
