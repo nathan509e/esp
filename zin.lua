@@ -60,23 +60,6 @@ local lockedTarget = nil
 local espAccumulator = 0
 
 --------------------------------------------------
--- FILTRO DE ALIADOS
---------------------------------------------------
-
-local function isAlly(player)
-
-	if not player
-		or player == localPlayer
-	then
-		return true
-	end
-
-	return localPlayer.Team ~= nil
-		and player.Team ~= nil
-		and player.Team == localPlayer.Team
-end
-
---------------------------------------------------
 -- LIMPEZA CASO EXECUTE NOVAMENTE
 --------------------------------------------------
 
@@ -265,10 +248,7 @@ local function createNameTag(player, character)
 
 	billboard.AlwaysOnTop = true
 	billboard.MaxDistance = 2000
-	billboard.Enabled =
-		config.NameESPEnabled
-		and not isAlly(player)
-
+	billboard.Enabled = config.NameESPEnabled
 	billboard.Parent = playerGui
 
 	local text =
@@ -327,9 +307,6 @@ local function createHighlight(player)
 
 		highlight.DepthMode =
 			Enum.HighlightDepthMode.AlwaysOnTop
-
-		highlight.Enabled =
-			not isAlly(player)
 
 		highlight.Parent =
 			character
@@ -982,12 +959,10 @@ local nameButton, setNameButton =
 			config.NameESPEnabled =
 				value
 
-			for player, billboard in pairs(nameTags) do
+			for _, billboard in pairs(nameTags) do
 
 				if billboard and billboard.Parent then
-					billboard.Enabled =
-						value
-						and not isAlly(player)
+					billboard.Enabled = value
 				end
 			end
 		end
@@ -2707,27 +2682,10 @@ local function updateESP()
 			continue
 		end
 
-		local ally =
-			isAlly(player)
-
 		highlight.Enabled =
 			config.ESPEnabled
-			and not ally
 
-		local billboard =
-			nameTags[player]
-
-		if billboard
-			and billboard.Parent
-		then
-			billboard.Enabled =
-				config.NameESPEnabled
-				and not ally
-		end
-
-		if not config.ESPEnabled
-			or ally
-		then
+		if not config.ESPEnabled then
 			continue
 		end
 
